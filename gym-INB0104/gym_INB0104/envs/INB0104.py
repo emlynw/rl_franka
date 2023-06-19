@@ -79,11 +79,11 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         #                        self.data.qpos.flat[2:], self.data.qvel.flat[:2],
         #                        self.get_body_com("left_finger") - self.get_body_com("target_object")])
         
-        position = self.data.qpos[0:9].flat.copy()
-        velocity = self.data.qvel[0:9].flat.copy()
+        robot_pos = self.data.qpos[0:9].flat.copy()
+        robot_vel = self.data.qvel[0:9].flat.copy()
         if self.use_distance:
-            return np.concatenate([position, velocity, self.get_body_com("left_finger") - self.get_body_com("target_object")])
+            return np.concatenate([robot_pos, robot_vel, self.get_body_com("left_finger") - self.get_body_com("target_object")])
         else:
-            return np.concatenate([position, velocity])
+            return np.concatenate([robot_pos, robot_vel])
 
 
