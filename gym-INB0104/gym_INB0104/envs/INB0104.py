@@ -30,8 +30,15 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         env_dir = os.path.join(cdir, "environments/INB0104/Robot_C.xml")
         MujocoEnv.__init__(self, env_dir, 5, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode
+        self._step_count = 0
+        self._step_limit = 500
 
     def step(self, a):
+        self.step_count += 1
+        if self._step_count >= self._step_limit:
+            truncated = True
+        else:
+            truncated = False
         vec = self.get_body_com("left_finger") - self.get_body_com("target_object")
         reward_dist = -np.linalg.norm(vec)
         reward_ctrl = -np.square(a).sum()
@@ -45,11 +52,12 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
             ob, 
             reward_dist, 
             False, 
-            False, 
+            truncated, 
             dict(reward_dist=reward_dist, reward_ctrl=reward_ctrl),
             )
 
     def reset_model(self):
+        self._step_count = 0
         # set up random initial state for the robot - but keep the fingers in place
         qpos = np.array([0, 0, 0, -1.57079, 0, 1.57079, -0.7853, 0.04, 0.04, 0.655, 0.515, 1.0, 0, 0, 0, 1])
         qpos[0] += self.np_random.uniform(low=-1, high=1)

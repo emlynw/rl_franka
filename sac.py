@@ -269,7 +269,7 @@ class SAC(nn.Module):
     dist = self.actor(emb, state)
     action = dist.sample() if sample else dist.mean
     action = action.clamp(*self.action_range)
-    return action.cpu().numpy()[0]
+    return action.cpu().numpy()
 
   def update_critic(
       self,

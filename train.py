@@ -16,7 +16,7 @@ import cv2
 from sac import SAC
 from replay_buffer_np import ReplayBuffer
 import gymnasium as gym
-from gymnasium.wrappers import PixelObservationWrapper
+from gymnasium.wrappers import PixelObservationWrapper, RecordEpisodeStatistics
 from wrappers import ActionRepeat, FrameStack, VideoRecorder, CustomObservation
 import gym_INB0104
 from gymnasium.spaces import Box, Dict
@@ -47,7 +47,6 @@ class dinov2_obs(gym.ObservationWrapper):
     pixels = pixels.unsqueeze(0).to(self.device)
     features = self.model(pixels)
     obs['embeddings'] = features[0].cpu().numpy()
-    print(obs['embeddings'].shape)
     return obs
 
 class Workspace:
@@ -66,7 +65,7 @@ class Workspace:
     self.action_repeat = 2
     self._global_step = 0
     self._global_episode = 0
-    self.ep_len = 100
+    self.ep_len = 500
   
     self.setup()
 
@@ -98,7 +97,7 @@ class Workspace:
     env = CustomObservation(env, crop_resolution=480, resize_resolution=224)
     env = dinov2_obs(env)
     env = FrameStack(env, frame_stack)
-    print("Observation space:", env.observation_space)
+
     return env
 
   @property
@@ -118,6 +117,7 @@ class Workspace:
       observation, info = self.eval_env.reset()
       embs = observation['embeddings']
       states = observation['state']
+      states = states.astype(np.float32)
       terminated = False
       truncated = False
       while not (terminated or truncated):
@@ -125,10 +125,11 @@ class Workspace:
         observation, reward, terminated, truncated, info = self.eval_env.step(action)
         embs = observation['embeddings']
         states = observation['state']
+        states = states.astype(np.float32)
         total_reward += reward
       end_reward = reward
-      for k, v in info["episode"].items():
-        stats[k].append(v)
+      # for k, v in info["episode"].items():
+      #   stats[k].append(v)
       stats["end_reward"].append(end_reward)
       stats["episode_reward"].append(total_reward)
     for k, v in stats.items():
@@ -147,7 +148,7 @@ class Workspace:
       mask = 1.0
       terminated = 0
       truncated = 0
-      
+      print(self.env.action_space)
       self.buffer.insert(embs[-1], states[-1], action, reward, mask)
       for i in tqdm(range(self.policy.num_train_steps)):
         if terminated or truncated:
@@ -159,6 +160,7 @@ class Workspace:
           self.writer.add_scalar("episode return", episode_reward, i)
           # Reset env
           obs, _ = self.env.reset()
+          print("reset")
           embs = obs['embeddings']
           states = obs['state']
           states = states.astype(np.float32)
@@ -176,7 +178,7 @@ class Workspace:
         if i < self.policy.num_seed_steps:
           action = self.env.action_space.sample()
         else:
-          action = self.policy.act(embs.flatten(), states.flatten(), eval_mode=False)
+          action = self.policy.act(embs.flatten(), states.flatten(), sample=True)
 
         # Update agent
         if i >= self.policy.num_seed_steps:

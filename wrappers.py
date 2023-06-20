@@ -94,7 +94,7 @@ class VideoRecorder(gym.Wrapper):
       save_dir,
       crop_resolution,
       resize_resolution,
-      fps = 10,
+      fps = 60,
   ):
     super().__init__(env)
 
@@ -102,12 +102,12 @@ class VideoRecorder(gym.Wrapper):
     os.makedirs(save_dir, exist_ok=True)
 
     if isinstance(resize_resolution, int):
-      resize_resolution = (resize_resolution, resize_resolution)
+      self.resize_resolution = (resize_resolution, resize_resolution)
     if isinstance(crop_resolution, int):
-      crop_resolution = (crop_resolution, crop_resolution)
+      self.crop_resolution = (crop_resolution, crop_resolution)
 
-    self.resize_h, self.resize_w = resize_resolution
-    self.crop_h, self.crop_w = crop_resolution
+    self.resize_h, self.resize_w = self.resize_resolution
+    self.crop_h, self.crop_w = self.crop_resolution
     self.fps = fps
     self.enabled = True
     self.current_episode = 0
