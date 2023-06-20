@@ -148,12 +148,9 @@ class Workspace:
       mask = 1.0
       terminated = 0
       truncated = 0
-      print(self.env.action_space)
       self.buffer.insert(embs[-1], states[-1], action, reward, mask)
       for i in tqdm(range(self.policy.num_train_steps)):
         if terminated or truncated:
-          if truncated:
-            print("truncated")
           if terminated:
             mask = 0.0
           else: mask = 1.0
@@ -162,7 +159,6 @@ class Workspace:
           self.writer.add_scalar("episode return", episode_reward, i)
           # Reset env
           obs, _ = self.env.reset()
-          print("reset")
           embs = obs['embeddings']
           states = obs['state']
           states = states.astype(np.float32)
