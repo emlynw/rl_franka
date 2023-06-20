@@ -152,6 +152,8 @@ class Workspace:
       self.buffer.insert(embs[-1], states[-1], action, reward, mask)
       for i in tqdm(range(self.policy.num_train_steps)):
         if terminated or truncated:
+          if truncated:
+            print("truncated")
           if terminated:
             mask = 0.0
           else: mask = 1.0
@@ -169,7 +171,7 @@ class Workspace:
           self.buffer.insert(embs[-1], states[-1], action, reward, mask)
 
         # Evaluate
-        if i % self.policy.eval_frequency == 0:
+        if i > self.policy.num_seed_steps and i % self.policy.eval_frequency == 0:
           eval_stats = self.evaluate()
           for k, v in eval_stats.items():
             self.writer.add_scalar(f"eval {k}", v, i)
