@@ -8,5 +8,4 @@ gym_INB0104.egg-info/top_level.txt
 gym_INB0104/envs/INB0104.py
 gym_INB0104/envs/__init__.py
 gym_INB0104/wrappers/__init__.py
-gym_INB0104/wrappers/frame_stack.py
 gym_INB0104/wrappers/reacher.py

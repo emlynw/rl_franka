@@ -30,15 +30,8 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         env_dir = os.path.join(cdir, "environments/INB0104/Robot_C.xml")
         MujocoEnv.__init__(self, env_dir, 5, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode
-        # self._step_count = 0
-        # self._step_limit = 500
 
     def step(self, a):
-        # self._step_count += 1
-        # if self._step_count >= self._step_limit:
-        #     truncated = True
-        # else:
-        #     truncated = False
         vec = self.get_body_com("left_finger") - self.get_body_com("target_object")
         reward_dist = -np.linalg.norm(vec)
         reward_ctrl = -np.square(a).sum()
