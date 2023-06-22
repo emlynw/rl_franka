@@ -59,7 +59,7 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
     def reset_model(self):
         self._step_count = 0
         # set up random initial state for the robot - but keep the fingers in place
-        qpos = np.array([0, 0, 0, -1.57079, 0, 1.57079, -0.7853, 0.04, 0.04, 0.655, 0.515, 1.0, 0, 0, 0, 1])
+        qpos = np.array([0, 0, 0, -1.57079, 0, 1.57079, -0.7853, 0.04, 0.04, 0.655, 0.515, 0.94, 0, 0, 0, 1])
         qpos[0] += self.np_random.uniform(low=-1, high=1)
         qpos[1] += self.np_random.uniform(low=-1, high=1)
         qpos[2] += self.np_random.uniform(low=-1, high=1)

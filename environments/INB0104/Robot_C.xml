@@ -7,7 +7,7 @@
   <include file="d435i_assets.xml"/>
 
   <visual>
-    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <!-- <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/> -->
     <rgba haze="0.15 0.25 0.35 1"/>
     <quality shadowsize="8192"/>
     <global azimuth="120" elevation="-20"/>
@@ -26,8 +26,8 @@
   <option integrator="implicitfast"/>
 
   <worldbody>
-    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
-    <light pos="0 1.5 1.5" dir="0 0 -1" directional="true"/>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <!-- <light pos="0 1.5 1.5" dir="0 0 -1" directional="true"/> -->
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
     <!-- Robot - Franka Panda -->
@@ -54,7 +54,7 @@
     <body pos='0.655 1.02 1.8' euler='2.35619 0 0'>
       <include file="d435i_body.xml"/>
     </body>
-    <camera name='side_camera' pos='0.63 1.01 1.78' euler='-0.5 0 3.14159' mode="fixed" fovy="57"/>  
+    <camera name='side_camera' pos='0.63 0.5 2.0' euler='0 0.15 1.57' mode="fixed" fovy="57"/>  
   
   </worldbody>
 

@@ -66,7 +66,7 @@ class Critic(nn.Module):
   ):
     super().__init__()
 
-    self.model = mlp(obs_dim + action_dim, hidden_dim, 1, hidden_depth, dropout=0.00)
+    self.model = mlp(obs_dim + action_dim, hidden_dim, 1, hidden_depth, dropout=0.01)
     self.apply(orthogonal_init)
 
   def forward(self, obs_action):
@@ -206,7 +206,7 @@ class SAC(nn.Module):
     self.critic_tau = 0.005  
     
 
-    self.feature_dim = 50
+    self.feature_dim = 100
 
     self.utd = 1
 
@@ -351,15 +351,15 @@ class SAC(nn.Module):
     if step % self.critic_update_frequency == 0:
       for i in range(self.utd):
         embs, states, action, reward, next_embs, next_states, mask = replay_buffer.sample(self.batch_size)
+        
         critic_info = self.update_critic(embs, states, action, reward, next_embs, next_states, mask)
-        actor_info, alpha_info = self.update_actor_and_alpha(embs, states)
         if i % self.critic_target_update_frequency == 0:
           soft_update_params(self.critic, self.critic_target, self.critic_tau)
       batch_info = {"batch_reward": reward.mean()}
 
-    # if step % self.actor_update_frequency == 0:
-    #   embs, states, action, reward, next_embs, next_states, mask = replay_buffer.sample(self.batch_size)
-    #   actor_info, alpha_info = self.update_actor_and_alpha(embs, states)
+    if step % self.actor_update_frequency == 0:
+      embs, states, action, reward, next_embs, next_states, mask = replay_buffer.sample(self.batch_size)
+      actor_info, alpha_info = self.update_actor_and_alpha(embs, states)
 
     return {**batch_info, **critic_info, **actor_info, **alpha_info}
 

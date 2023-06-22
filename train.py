@@ -43,6 +43,8 @@ class dinov2_obs(gym.ObservationWrapper):
 
   def observation(self, obs):
     pixels = obs['pixels']
+    # cv2.imshow("pixels", cv2.cvtColor(pixels, cv2.COLOR_RGB2BGR))
+    # cv2.waitKey(1)
     pixels = self.transform(pixels)
     pixels = pixels.unsqueeze(0).to(self.device)
     features = self.model(pixels)
@@ -63,8 +65,6 @@ class Workspace:
     self.writer = SummaryWriter(log_dir=tb_path)
     self.frame_stack = 3
     self.action_repeat = 2
-    self._global_step = 0
-    self._global_episode = 0
     self.ep_len = 500
   
     self.setup()
@@ -100,29 +100,21 @@ class Workspace:
 
     return env
 
-  @property
-  def global_step(self):
-      return self._global_step
-
-  @property
-  def global_episode(self):
-      return self._global_episode
-
-  def evaluate(self):
+  def evaluate(self, policy, env):
     """Evaluate the policy and dump rollout videos to disk."""
-    self.policy.eval()
+    policy.eval()
     stats = collections.defaultdict(list)
-    total_reward = 0
     for j in range(self.policy.num_eval_episodes):
-      observation, info = self.eval_env.reset()
+      observation, info = env.reset()
       embs = observation['embeddings']
       states = observation['state']
       states = states.astype(np.float32)
       terminated = False
       truncated = False
+      total_reward = 0
       while not (terminated or truncated):
-        action = self.policy.act(embs.flatten(), states.flatten(), sample=False)
-        observation, reward, terminated, truncated, info = self.eval_env.step(action)
+        action = policy.act(embs.flatten(), states.flatten(), sample=False)
+        observation, reward, terminated, truncated, info = env.step(action)
         embs = observation['embeddings']
         states = observation['state']
         states = states.astype(np.float32)
@@ -138,7 +130,7 @@ class Workspace:
   
   def train(self):
     try:
-      episode_step, episode_reward = 0, 0
+      episode_reward = 0
       observation, _ = self.env.reset()
       embs = observation['embeddings']
       states = observation['state']
@@ -149,12 +141,29 @@ class Workspace:
       terminated = 0
       truncated = 0
       self.buffer.insert(embs[-1], states[-1], action, reward, mask)
+
       for i in tqdm(range(self.policy.num_train_steps)):
+        # Take action
+        if i < self.policy.num_seed_steps:
+          action = self.env.action_space.sample()
+        else:
+          action = self.policy.act(embs.flatten(), states.flatten(), sample=True)
+        # Take env step
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        embs = obs['embeddings']
+        states = obs['state']
+        states = states.astype(np.float32)
+        episode_reward += reward
+
+        if not terminated or truncated:
+          mask=1.0
+        else: 
+          mask=0.0
+        
+        self.buffer.insert(embs[-1], states[-1], action, reward, mask)
+
+
         if terminated or truncated:
-          if terminated:
-            mask = 0.0
-          else: mask = 1.0
-          self._global_episode += 1
           self.writer.add_scalar("episode end reward", reward, i)
           self.writer.add_scalar("episode return", episode_reward, i)
           # Reset env
@@ -162,25 +171,14 @@ class Workspace:
           embs = obs['embeddings']
           states = obs['state']
           states = states.astype(np.float32)
-          episode_step = 0
           episode_reward = 0
           self.buffer.insert(embs[-1], states[-1], action, reward, mask)
 
-        # Evaluate
-        if i > self.policy.num_seed_steps and i % self.policy.eval_frequency == 0:
-          eval_stats = self.evaluate()
-          for k, v in eval_stats.items():
-            self.writer.add_scalar(f"eval {k}", v, i)
-
-        # Take action
-        if i < self.policy.num_seed_steps:
-          action = self.env.action_space.sample()
-        else:
-          action = self.policy.act(embs.flatten(), states.flatten(), sample=True)
-
         # Update agent
         if i >= self.policy.num_seed_steps:
+          self.policy.train()
           train_info = self.policy.update(self.buffer, i)
+
           if i % self.policy.log_frequency == 0:
             if train_info is not None:
               for k, v in train_info.items():
@@ -188,20 +186,16 @@ class Workspace:
             ram_usage = psutil.virtual_memory().percent
             self.writer.add_scalar("ram usage", ram_usage, i)
 
-        # Take env step
-        obs, reward, terminated, truncated, info = self.env.step(action)
-        embs = obs['embeddings']
-        states = obs['state']
-        states = states.astype(np.float32)
-        if terminated:
-          mask=0.0
-        else: 
-          mask=1.0
+          # Evaluate
+          if i % self.policy.eval_frequency == 0:
+            eval_stats = self.evaluate(self.policy, self.eval_env)
+            for k, v in eval_stats.items():
+              self.writer.add_scalar(f"eval {k}", v, i)
+
         
-        episode_reward += reward
-        episode_step += 1
-        self._global_step += 1
-        self.buffer.insert(embs[-1], states[-1], action, reward, mask)
+
+        
+
 
     except KeyboardInterrupt:
       print("Caught keyboard interrupt. Saving before quitting.")
