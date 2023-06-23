@@ -137,7 +137,7 @@ class drqv2Agent(nn.Module):
 
     self.discount = 0.99
     self.nstep = 3
-    self.capacity = 200_000
+    self.capacity = 20_000
     self.num_train_steps = 1_000_000
     self.num_eval_episodes = 5
     self.eval_frequency = 10_000
@@ -187,6 +187,10 @@ class drqv2Agent(nn.Module):
   def update_critic(self, obs, action, reward, discount, next_obs, step):
     metrics = dict()
 
+    reward = reward.unsqueeze(-1)
+    discount = discount.unsqueeze(-1)
+
+
     with torch.no_grad():
         stddev = utils.schedule(self.stddev_schedule, step)
         dist = self.actor(next_obs, stddev)
@@ -197,6 +201,7 @@ class drqv2Agent(nn.Module):
 
     Q1, Q2 = self.critic(obs, action)
     critic_loss = F.mse_loss(Q1, target_Q) + F.mse_loss(Q2, target_Q)
+
 
     if self.use_tb:
         metrics['critic_target_q'] = target_Q.mean().item()
