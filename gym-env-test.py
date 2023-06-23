@@ -1,6 +1,5 @@
 import gymnasium as gym
 from gymnasium.wrappers import PixelObservationWrapper
-from wrappers import FrameStack
 import cv2
 
 import gym_INB0104

@@ -47,14 +47,14 @@
     </body> -->
     <body name="target_object" pos="0.655 0.515 0.9">
       <freejoint name="target"/>
-      <geom name="target_object" type="box" size="0.04 0.02 0.02" rgba="0.95294117647 0.23921568627 0.23921568627 1.0"/>
+      <geom name="target_object" type="box" size="0.04 0.02 0.02" rgba="0.95294117647 0.23921568627 0.23921568627 1.0"/> 
     </body>
 
     <!-- Camera -->
-    <body pos='0.655 1.02 1.8' euler='2.35619 0 0'>
+    <!-- <body pos='0.655 1.02 1.8' euler='2.35619 0 0'>
       <include file="d435i_body.xml"/>
-    </body>
-    <camera name='side_camera' pos='0.63 0.5 2.0' euler='0 0.15 1.57' mode="fixed" fovy="57"/>  
+    </body> -->
+    <camera name='side_camera' pos='1.8 0.5 1.7' euler='0 1.25 1.57' mode="fixed" fovy="57"/>  
   
   </worldbody>
 
