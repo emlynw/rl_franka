@@ -2,3 +2,4 @@ __pycache__/
 tb/
 eval_vids/
 checkpoints/
+buffer/

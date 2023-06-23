@@ -16,8 +16,8 @@ import cv2
 from drqv2 import drqv2Agent
 from replay_buffer import ReplayBufferStorage, make_replay_loader
 import gymnasium as gym
-from gymnasium.wrappers import PixelObservationWrapper, RecordEpisodeStatistics, FrameStack
-from wrappers import ActionRepeat, FrameStack, VideoRecorder, CustomObservation
+from gymnasium.wrappers import PixelObservationWrapper
+from wrappers import ActionRepeat, VideoRecorder, CustomObservation, FrameStackWrapper
 import gym_INB0104
 from gymnasium.spaces import Box, Dict
 import utils
@@ -43,7 +43,7 @@ class Workspace:
   def setup(self):
     self.env = self.create_environment(name="gym_INB0104/INB0104-v0",frame_stack=self.frame_stack, action_repeat=self.action_repeat)
     self.eval_env = self.create_environment(name="gym_INB0104/INB0104-v0", frame_stack=self.frame_stack, action_repeat=self.action_repeat, record=True)
-    self.policy = drqv2Agent(self.device, self.env)
+    self.policy = drqv2Agent(self.device, self.env.observation_space.shape, self.env.action_space.shape)
     # create replay buffer
     self.work_dir = Path.cwd()
 
@@ -54,6 +54,12 @@ class Workspace:
         self.policy.batch_size, 1,
         False, 3, self.policy.discount)
     self._replay_iter = None
+
+  @property
+  def replay_iter(self):
+      if self._replay_iter is None:
+          self._replay_iter = iter(self.replay_loader)
+      return self._replay_iter
       
   def create_environment(self, name, frame_stack=3, action_repeat=2, record=False, video_dir="./eval_vids"):
     
@@ -62,48 +68,24 @@ class Workspace:
       env = ActionRepeat(env, action_repeat)
     if record:
       env = VideoRecorder(env, save_dir=video_dir, crop_resolution=480, resize_resolution=224)
-    render_kwargs = dict(height=224, width=224)
-    env = PixelObservationWrapper(env, pixels_only=False, render_kwargs=render_kwargs)
-    # env = CustomObservation(env, crop_resolution=480, resize_resolution=224)
-    env = FrameStack(env, frame_stack)
+    env = PixelObservationWrapper(env, pixels_only=True)
+    env = CustomObservation(env, crop_resolution=480, resize_resolution=112)
+    env = FrameStackWrapper(env, frame_stack)
 
     return env
 
-  def evaluate(self, policy, env):
-    """Evaluate the policy and dump rollout videos to disk."""
-    policy.eval()
-    stats = collections.defaultdict(list)
-    for j in range(self.policy.num_eval_episodes):
-      observation, info = env.reset()
-      terminated = False
-      truncated = False
-      total_reward = 0
-      while not (terminated or truncated):
-        action = policy.act(observation, sample=False)
-        observation, reward, terminated, truncated, info = env.step(action)
-        total_reward += reward
-      end_reward = reward
-      # for k, v in info["episode"].items():
-      #   stats[k].append(v)
-      stats["end_reward"].append(end_reward)
-      stats["episode_reward"].append(total_reward)
-    for k, v in stats.items():
-      stats[k] = np.mean(v)
-    return stats
-  
   def eval(self, i):
     stats = collections.defaultdict(list)
     for j in range(self.policy.num_eval_episodes):
-      observation, info = self.eval_env.reset()
+      obs, info = self.eval_env.reset()
       terminated = False
       truncated = False
       total_reward = 0
       while not (terminated or truncated):
         with torch.no_grad(), utils.eval_mode(self.policy):
-          action = self.policy.act(observation, i, eval_mode=True)
-        observation, reward, terminated, truncated, info = self.eval_env.step(action)
+          action = self.policy.act(obs, i, eval_mode=True)
+        obs, reward, terminated, truncated, info = self.eval_env.step(action)
         total_reward += reward
-      self.video_recorder.save(f'{self.global_step}_{j}.mp4')
       end_reward = reward
       stats["end_reward"].append(end_reward)
       stats["episode_reward"].append(total_reward)
@@ -113,23 +95,23 @@ class Workspace:
   
   def train(self):
     try:
-      obs, _ = self.env.reset()
+      obs, info = self.env.reset()
       action = self.env.action_space.sample()
       reward = -1.0
       mask = 1.0
-      terminated = 0.0
-      truncated = 0.0
+      terminated = False
+      truncated = False
+      episode_reward = 0
       time_step = {"observation": obs, "action": action, "reward": reward, "terminated": terminated, "truncated": truncated}
       self.replay_storage.add(time_step)
       for i in tqdm(range(self.policy.num_train_steps)):
-        if time_step.last():
+        if terminated or truncated:
           self.writer.add_scalar("episode end reward", reward, i)
           self.writer.add_scalar("episode return", episode_reward, i)
           # Reset env
           time_step = self.env.reset()
           time_step = {"observation": obs, "action": action, "reward": reward, "terminated": terminated, "truncated": truncated}
           self.replay_storage.add(time_step)
-          episode_step = 0
           episode_reward = 0
 
         # Evaluate
@@ -140,7 +122,7 @@ class Workspace:
 
         # Sample action
         with torch.no_grad(), utils.eval_mode(self.policy):
-          action = self.policy.act(time_step.observation, i+1, eval_mode=False)
+          action = self.policy.act(obs, i+1, eval_mode=False)
 
         # Update agent
         if i >= self.policy.num_seed_steps:
@@ -154,10 +136,9 @@ class Workspace:
 
         # Take env step
         obs, reward, terminated, truncated, info = self.env.step(action)
-        episode_reward += time_step.reward
+        episode_reward += reward
         time_step = {"observation": obs, "action": action, "reward": reward, "terminated": terminated, "truncated": truncated}
         self.replay_storage.add(time_step)
-        episode_step += 1
 
 
     except KeyboardInterrupt:
