@@ -22,19 +22,34 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         "render_fps": 100
     }
     
-    def __init__(self, render_mode=None, use_distance=False, **kwargs):
+    def __init__(self, render_mode=None, use_distance=False, controller="velocity", **kwargs):
         utils.EzPickle.__init__(self, use_distance, **kwargs)
         self.use_distance = use_distance
+        self.controller = controller
         observation_space = Box(low=-np.inf, high=np.inf, shape=(18,), dtype=np.float64)
         cdir = os.getcwd()
         env_dir = os.path.join(cdir, "environments/INB0104/Robot_C.xml")
         MujocoEnv.__init__(self, env_dir, 5, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode
+        self.max_position = np.array([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973])
+        self.min_position = np.array([-2.8973, -1.7628, -2.8973, -3.0718, -2.8973 -0.0175, -2.8973])
+        self.max_velocity = np.array([2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100])
+        self.max_torque = np.array([87, 87, 87, 87, 12, 12, 12])
+
+                                      
 
     def step(self, a):
         vec = self.get_body_com("left_finger") - self.get_body_com("target_object")
         reward_dist = -np.linalg.norm(vec)
         reward_ctrl = -np.square(a).sum()
+        if self.controller == "position":
+            a = (a+1.0)/2.0
+            a = a*(self.max_position-self.min_position)+self.min_position
+        elif self.controller == "velocity":
+            a = a*(self.max_velocity)
+        elif self.controller == "torque":
+            a = a*(self.max_torque)
+
 
         self.do_simulation(a, self.frame_skip)
         if self.render_mode == "human":

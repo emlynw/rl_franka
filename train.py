@@ -124,7 +124,7 @@ class Workspace:
         # Sample action
         with torch.no_grad(), utils.eval_mode(self.policy):
           action = self.policy.act(obs, i, eval_mode=False)
-
+          
         # Update agent
         if i >= self.policy.num_seed_steps:
           train_info = self.policy.update(self.replay_iter, i)
