@@ -31,10 +31,10 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         env_dir = os.path.join(cdir, "environments/INB0104/Robot_C.xml")
         MujocoEnv.__init__(self, env_dir, 5, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode
-        self.max_position = np.array([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973])
-        self.min_position = np.array([-2.8973, -1.7628, -2.8973, -3.0718, -2.8973 -0.0175, -2.8973])
-        self.max_velocity = np.array([2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100])
-        self.max_torque = np.array([87, 87, 87, 87, 12, 12, 12])
+        self.max_position = np.array([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973, 1.0])
+        self.min_position = np.array([-2.8973, -1.7628, -2.8973, -3.0718, -2.8973 -0.0175, -2.8973, -1.0])
+        self.max_velocity = np.array([2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100, 1.0])
+        self.max_torque = np.array([87, 87, 87, 87, 12, 12, 12, 12, 1.0])
 
                                       
 
