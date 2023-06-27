@@ -26,7 +26,7 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         utils.EzPickle.__init__(self, use_distance, **kwargs)
         self.use_distance = use_distance
         self.controller = controller
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(18,), dtype=np.float64)
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64)
         cdir = os.getcwd()
         env_dir = os.path.join(cdir, "environments/INB0104/Robot_C.xml")
         MujocoEnv.__init__(self, env_dir, 5, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
@@ -37,7 +37,10 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         self.max_torque = np.array([87, 87, 87, 87, 12, 12, 12, 12, 1.0])
 
     def step(self, a):
-        vec = self.get_body_com("left_finger") - self.get_body_com("target_object")
+        target_pos = self.get_body_com("target_object")
+        target_pos[2] += 0.1
+        
+        vec = self.get_body_com("left_finger") - target_pos
         reward_dist = -np.linalg.norm(vec)
         reward_ctrl = -np.square(a).sum()
         if self.controller == "position":
@@ -101,5 +104,4 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
             return np.concatenate([robot_pos, robot_vel, self.get_body_com("left_finger") - self.get_body_com("target_object")])
         else:
             return np.concatenate([robot_pos, robot_vel])
-
 

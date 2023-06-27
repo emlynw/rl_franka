@@ -148,7 +148,6 @@ class Workspace:
           obs, _ = self.env.reset()
           embs = obs['embeddings']
           states = obs['state']
-          print(states)
           states = states.astype(np.float32)
           episode_reward = 0
           self.buffer.insert(embs[-1], states[-1], action, reward, mask)
