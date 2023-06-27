@@ -300,7 +300,7 @@ class SAC(nn.Module):
     critic_loss.backward()
     self.critic_optimizer.step()
 
-    return {"critic_loss": critic_loss}
+    return {"critic_loss": critic_loss, "target_q": target_q.mean().item()}
 
   def update_actor_and_alpha(
       self,
