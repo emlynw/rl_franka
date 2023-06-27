@@ -167,7 +167,7 @@ class SAC(nn.Module):
     self.env = env
     self.capacity = 1_000_000
     self.num_train_steps = 1_000_000
-    self.num_expl_steps = 2000
+    self.num_expl_steps = 4000
     self.num_seed_steps = 4000
     self.num_eval_episodes = 5
     self.eval_frequency = 10_000
