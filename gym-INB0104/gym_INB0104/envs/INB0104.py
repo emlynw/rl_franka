@@ -26,7 +26,7 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         utils.EzPickle.__init__(self, use_distance, **kwargs)
         self.use_distance = use_distance
         self.controller = controller
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(18,), dtype=np.float64)
+        observation_space = Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64)
         cdir = os.getcwd()
         env_dir = os.path.join(cdir, "environments/INB0104/Robot_C.xml")
         MujocoEnv.__init__(self, env_dir, 5, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)

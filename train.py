@@ -77,7 +77,6 @@ class Workspace:
 
     self.buffer = ReplayBuffer(
         embs_shape = (self.env.observation_space['embeddings'].shape[-1],),
-        state_shape = (self.env.observation_space['state'].shape[-1],),
         obs_frame_stack=self.frame_stack,
         action_shape=self.env.action_space.shape,
         batch_size=self.policy.batch_size,
@@ -107,17 +106,13 @@ class Workspace:
     for j in range(self.policy.num_eval_episodes):
       observation, info = env.reset()
       embs = observation['embeddings']
-      states = observation['state']
-      states = states.astype(np.float32)
       terminated = False
       truncated = False
       total_reward = 0
       while not (terminated or truncated):
-        action = policy.act(embs.flatten(), states.flatten(), sample=False)
+        action = policy.act(embs.flatten(), sample=False)
         observation, reward, terminated, truncated, info = env.step(action)
         embs = observation['embeddings']
-        states = observation['state']
-        states = states.astype(np.float32)
         total_reward += reward
       end_reward = reward
       stats["end_reward"].append(end_reward)
@@ -131,14 +126,12 @@ class Workspace:
       episode_reward = 0
       observation, _ = self.env.reset()
       embs = observation['embeddings']
-      states = observation['state']
-      states = states.astype(np.float32)
       action = self.env.action_space.sample()
       reward = -1.0
       mask = 1.0
       terminated = False
       truncated = False
-      self.buffer.insert(embs[-1], states[-1], action, reward, mask)
+      self.buffer.insert(embs[-1], action, reward, mask)
 
       for i in tqdm(range(self.policy.num_train_steps)):
         if terminated or truncated:
@@ -147,11 +140,8 @@ class Workspace:
           # Reset env
           obs, _ = self.env.reset()
           embs = obs['embeddings']
-          states = obs['state']
-          print(states)
-          states = states.astype(np.float32)
           episode_reward = 0
-          self.buffer.insert(embs[-1], states[-1], action, reward, mask)
+          self.buffer.insert(embs[-1], action, reward, mask)
 
       # Evaluate
         if i % self.policy.eval_frequency == 0:
@@ -163,7 +153,7 @@ class Workspace:
         if i < self.policy.num_seed_steps:
           action = self.env.action_space.sample()
         else:
-          action = self.policy.act(embs.flatten(), states.flatten(), sample=True)
+          action = self.policy.act(embs.flatten(), sample=True)
 
         # Update agent
         if i >= self.policy.num_seed_steps:
@@ -180,8 +170,6 @@ class Workspace:
         # Take env step
         obs, reward, terminated, truncated, info = self.env.step(action)
         embs = obs['embeddings']
-        states = obs['state']
-        states = states.astype(np.float32)
         episode_reward += reward
 
         if terminated:
@@ -189,7 +177,7 @@ class Workspace:
         else: 
           mask=0.0
         
-        self.buffer.insert(embs[-1], states[-1], action, reward, mask)      
+        self.buffer.insert(embs[-1], action, reward, mask)      
 
 
     except KeyboardInterrupt:
