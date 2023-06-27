@@ -22,7 +22,7 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         "render_fps": 100
     }
     
-    def __init__(self, render_mode=None, use_distance=False, controller="velocity", **kwargs):
+    def __init__(self, render_mode=None, use_distance=False, controller="position", **kwargs):
         utils.EzPickle.__init__(self, use_distance, **kwargs)
         self.use_distance = use_distance
         self.controller = controller
@@ -37,7 +37,10 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         self.max_torque = np.array([87, 87, 87, 87, 12, 12, 12, 12, 1.0])
 
     def step(self, a):
-        vec = self.get_body_com("left_finger") - self.get_body_com("target_object")
+        target_pos = self.get_body_com("target_object")
+        target_pos[2] += 0.1
+        
+        vec = self.get_body_com("left_finger") - target_pos
         reward_dist = -np.linalg.norm(vec)
         reward_ctrl = -np.square(a).sum()
         if self.controller == "position":

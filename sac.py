@@ -164,9 +164,10 @@ class SAC(nn.Module):
     self.env = env
     self.capacity = 1_000_000
     self.num_train_steps = 1_000_000
-    self.num_seed_steps = 4000
+    self.num_seed_steps = 2000
+    self.num_expl_steps = 4000
     self.num_eval_episodes = 5
-    self.eval_frequency = 20_000
+    self.eval_frequency = 10_000
     self.checkpoint_frequency = 20_000
     self.log_frequency = 1_000
     self.batch_size = 256
@@ -224,7 +225,7 @@ class SAC(nn.Module):
     )
 
     # Set target entropy to -|A|.
-    self.target_entropy = -self.action_dim/2
+    self.target_entropy = -self.action_dim
 
     # Optimizers.
 

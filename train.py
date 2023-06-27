@@ -43,6 +43,7 @@ class dinov2_obs(gym.ObservationWrapper):
 
   def observation(self, obs):
     pixels = obs['pixels']
+    # print(pixels.shape)
     # cv2.imshow("pixels", cv2.cvtColor(pixels, cv2.COLOR_RGB2BGR))
     # cv2.waitKey(1)
     pixels = self.transform(pixels)
@@ -65,7 +66,7 @@ class Workspace:
     self.writer = SummaryWriter(log_dir=tb_path)
     self.frame_stack = 3
     self.action_repeat = 2
-    self.ep_len = 500
+    self.ep_len = 25
   
     self.setup()
 
@@ -112,6 +113,7 @@ class Workspace:
       while not (terminated or truncated):
         action = policy.act(embs.flatten(), sample=False)
         observation, reward, terminated, truncated, info = env.step(action)
+        reward = info["reward_dist"]
         embs = observation['embeddings']
         total_reward += reward
       end_reward = reward
@@ -150,7 +152,7 @@ class Workspace:
             self.writer.add_scalar(f"eval {k}", v, i)
 
         # Take action
-        if i < self.policy.num_seed_steps:
+        if i < self.policy.num_expl_steps:
           action = self.env.action_space.sample()
         else:
           action = self.policy.act(embs.flatten(), sample=True)
@@ -169,6 +171,7 @@ class Workspace:
 
         # Take env step
         obs, reward, terminated, truncated, info = self.env.step(action)
+        reward = info["reward_dist"]
         embs = obs['embeddings']
         episode_reward += reward
 

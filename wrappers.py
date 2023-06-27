@@ -94,7 +94,7 @@ class VideoRecorder(gym.Wrapper):
       save_dir,
       crop_resolution,
       resize_resolution,
-      fps = 60,
+      fps = 25,
   ):
     super().__init__(env)
 
