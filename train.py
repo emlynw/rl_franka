@@ -113,7 +113,7 @@ class Workspace:
       truncated = False
       total_reward = 0
       while not (terminated or truncated):
-        action = policy.act(embs.flatten(), states.flatten(), sample=False)
+        action = policy.act(embs.flatten(), states, sample=False)
         observation, reward, terminated, truncated, info = env.step(action)
         embs = observation['embeddings']
         states = observation['state']
@@ -138,7 +138,7 @@ class Workspace:
       mask = 1.0
       terminated = False
       truncated = False
-      self.buffer.insert(embs[-1], states[-1], action, reward, mask)
+      self.buffer.insert(embs[-1], states, action, reward, mask)
 
       for i in tqdm(range(self.policy.num_train_steps)):
         if terminated or truncated:
@@ -150,7 +150,7 @@ class Workspace:
           states = obs['state']
           states = states.astype(np.float32)
           episode_reward = 0
-          self.buffer.insert(embs[-1], states[-1], action, reward, mask)
+          self.buffer.insert(embs[-1], states, action, reward, mask)
 
       # Evaluate
         if i % self.policy.eval_frequency == 0:
@@ -159,10 +159,10 @@ class Workspace:
             self.writer.add_scalar(f"eval {k}", v, i)
 
         # Take action
-        if i < self.policy.num_seed_steps:
+        if i < self.policy.num_expl_steps:
           action = self.env.action_space.sample()
         else:
-          action = self.policy.act(embs.flatten(), states.flatten(), sample=True)
+          action = self.policy.act(embs.flatten(), states, sample=True)
 
         # Update agent
         if i >= self.policy.num_seed_steps:
@@ -188,7 +188,7 @@ class Workspace:
         else: 
           mask=0.0
         
-        self.buffer.insert(embs[-1], states[-1], action, reward, mask)      
+        self.buffer.insert(embs[-1], states, action, reward, mask)      
 
 
     except KeyboardInterrupt:

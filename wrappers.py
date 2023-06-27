@@ -13,8 +13,7 @@ class FrameStack(gym.Wrapper):
         self._embedding_shape = env.observation_space['embeddings'].shape
         self._state_shape = env.observation_space['state'].shape
         self._embedding_frames = deque([], maxlen=num_frames)
-        self._state_frames = deque([], maxlen=num_frames)
-        self.observation_space = Dict({"state": Box(low=-np.inf, high=np.inf, shape=(num_frames, *self._state_shape), dtype=np.float32),
+        self.observation_space = Dict({"state": Box(low=-np.inf, high=np.inf, shape=self._state_shape, dtype=np.float32),
                                        "embeddings": Box(low=-np.inf, high=np.inf, shape=(num_frames, *self._embedding_shape), dtype=np.float32)})
         self.action_space = env.action_space
 
@@ -22,27 +21,19 @@ class FrameStack(gym.Wrapper):
     def step(self, action):
 
         obs, reward, terminated, truncated, info = self._env.step(action)
-        state = obs['state']
         embeddings = obs['embeddings']
-        self._state_frames.append(state)
         self._embedding_frames.append(embeddings)
-        stacked_states = np.array(list(self._state_frames))
         stacked_embeddings = np.array(list(self._embedding_frames))
-        obs['state'] = stacked_states
         obs['embeddings'] = stacked_embeddings
 
         return obs, reward, terminated, truncated, info
     
     def reset(self):
         obs, info = self._env.reset()
-        state = obs['state']
         embeddings = obs['embeddings']
         for _ in range(self._num_frames):
-            self._state_frames.append(state)
             self._embedding_frames.append(embeddings)
-        stacked_states = np.array(list(self._state_frames))
         stacked_embeddings = np.array(list(self._embedding_frames))
-        obs['state'] = stacked_states
         obs['embeddings'] = stacked_embeddings
         
         return obs, info

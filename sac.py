@@ -167,6 +167,7 @@ class SAC(nn.Module):
     self.env = env
     self.capacity = 1_000_000
     self.num_train_steps = 1_000_000
+    self.num_expl_steps = 2000
     self.num_seed_steps = 4000
     self.num_eval_episodes = 5
     self.eval_frequency = 10_000
@@ -189,7 +190,7 @@ class SAC(nn.Module):
     self.discount = 0.99
     # env things
     self.emb_dim = self.env.observation_space['embeddings'].shape[-1]*3
-    self.state_dim = self.env.observation_space['state'].shape[-1]*3
+    self.state_dim = self.env.observation_space['state'].shape[-1]
     self.action_dim = self.env.action_space.shape[0]
     self.action_range = [float(env.action_space.low.min()),
       float(env.action_space.high.max()),]

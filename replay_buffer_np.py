@@ -158,13 +158,12 @@ class ReplayBuffer:
     if self.obs_frame_stack > 1:
         embs = self.frame_stack(self.embs, ep_idxs, obs_step_idxs, self.obs_frame_stack, self.sampled_embs, self.temp_embs)
         next_embs = self.frame_stack(self.embs, ep_idxs, step_idxs, self.obs_frame_stack, self.sampled_next_embs, self.temp_embs)
-        states = self.frame_stack(self.states, ep_idxs, obs_step_idxs, self.obs_frame_stack, self.sampled_states, self.temp_states)
-        next_states = self.frame_stack(self.states, ep_idxs, step_idxs, self.obs_frame_stack, self.sampled_next_states, self.temp_states)
     else:
         embs = self.embs[ep_idxs, obs_step_idxs]
         next_embs = self.embs[ep_idxs, step_idxs]
-        states = self.states[ep_idxs, obs_step_idxs]
-        next_states = self.states[ep_idxs, step_idxs]
+    
+    states = self.states[ep_idxs, obs_step_idxs]
+    next_states = self.states[ep_idxs, step_idxs]   
 
     return Batch(
         embs=self._to_tensor(embs),
