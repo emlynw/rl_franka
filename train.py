@@ -84,6 +84,7 @@ class Workspace:
       while not (terminated or truncated):
         with torch.no_grad(), utils.eval_mode(self.policy):
           action = self.policy.act(obs, i, eval_mode=True)
+          action = self.scale_action(action)
         obs, reward, terminated, truncated, info = self.eval_env.step(action)
         total_reward += reward
       end_reward = reward
@@ -92,6 +93,12 @@ class Workspace:
     for k, v in stats.items():
       stats[k] = np.mean(v)
     return stats
+  
+  def scale_action(self, a):
+    low, high = self.env.action_space.low, self.env.action_space.high
+    range = high - low
+    a = (range/2.0)*(a+1.0) + low
+    return a
   
   def train(self):
     try:
@@ -124,6 +131,7 @@ class Workspace:
         # Sample action
         with torch.no_grad(), utils.eval_mode(self.policy):
           action = self.policy.act(obs, i, eval_mode=False)
+        action = self.scale_action(action)
           
         # Update agent
         if i >= self.policy.num_seed_steps:

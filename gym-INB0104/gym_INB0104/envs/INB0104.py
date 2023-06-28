@@ -22,36 +22,36 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         "render_fps": 100
     }
     
-    def __init__(self, render_mode=None, use_distance=False, controller="torque", **kwargs):
+    def __init__(self, render_mode=None, use_distance=False, **kwargs):
         utils.EzPickle.__init__(self, use_distance, **kwargs)
         self.use_distance = use_distance
-        self.controller = controller
         observation_space = Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64)
         cdir = os.getcwd()
         env_dir = os.path.join(cdir, "environments/INB0104/Robot_C.xml")
         MujocoEnv.__init__(self, env_dir, 5, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode
-
-        self.max_position = np.array([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973, 255])
-        self.min_position = np.array([-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973, 0])
+        # Leave these in in case useful later
+        self.max_position = np.array([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973, 1.0])
+        self.min_position = np.array([-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973, -1.0])
         self.max_velocity = np.array([2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100, 1.0])
-        self.max_torque = np.array([87, 87, 87, 87, 12, 12, 12, 1.0])
+        self.max_torque = np.array([87, 87, 87, 87, 12, 12, 12, 12, 1.0])
 
     def step(self, a):
         target_pos = self.get_body_com("target_object")
         target_pos[2] += 0.1
         
-        vec = self.get_body_com("left_finger") - target_pos
+        vec = self.get_body_com("hand") - target_pos
         reward_dist = -np.linalg.norm(vec)
-        reward_ctrl = -np.square(a).sum()
-        reward = reward_dist + 0.1*reward_ctrl
-        if self.controller == "position":
-            a = (a+1.0)/2.0
-            a = a*(self.max_position-self.min_position)+self.min_position
-        elif self.controller == "velocity":
-            a = a*(self.max_velocity)
-        elif self.controller == "torque":
-            a = a*(self.max_torque)
+        # reward_ctrl = -np.square(a).sum()
+
+        # num_contacts = self.data.ncon
+        # contact_reward = -max(0,num_contacts-4)
+        quat = self.data.xquat[10]
+        quat = np.array([quat[0], quat[1], quat[2], quat[3]])
+        upright_orientation = np.array([1, 0, 0, 0])
+        reward_ori = -np.linalg.norm(quat - upright_orientation)
+
+        reward = reward_dist + reward_ori
 
         self.do_simulation(a, self.frame_skip)
         if self.render_mode == "human":
@@ -63,7 +63,7 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
             reward, 
             False, 
             False, 
-            dict(reward_dist=reward_dist, reward_ctrl=reward_ctrl),
+            dict(reward_dist=reward_dist, reward_ori=reward_ori),
             )
 
     def reset_model(self):
@@ -77,7 +77,6 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         qpos[4] += self.np_random.uniform(low=-1, high=1)
         qpos[5] += self.np_random.uniform(low=-1, high=1)
         qpos[6] += self.np_random.uniform(low=-1, high=1)
-        # qpos = ( self.np_random.uniform(low=-0.4, high=0.4, size=self.model.nq) + self.init_qpos)
 
         # create random x and y position for the target object, but make sure it is within a 1 meter circle -- this bit maybe useful later - not for now though
         while True:
@@ -91,17 +90,9 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         return self._get_obs()
 
     def _get_obs(self):
-        
-        # theta = self.data.qpos.flat[:2]
-        # return np.concatenate([np.cos(theta), np.sin(theta),
-        #                        self.data.qpos.flat[2:], self.data.qvel.flat[:2],
-        #                        self.get_body_com("left_finger") - self.get_body_com("target_object")])
-        
         robot_pos = self.data.qpos[0:8].flat.copy()
-        robot_pos = (robot_pos-self.min_position)/(self.max_position-self.min_position)
         robot_vel = self.data.qvel[0:8].flat.copy()
-        robot_vel = robot_vel/self.max_velocity
         if self.use_distance:
-            return np.concatenate([robot_pos, robot_vel, self.get_body_com("left_finger") - self.get_body_com("target_object")])
+            return np.concatenate([robot_pos, robot_vel, self.get_body_com("hand") - self.get_body_com("target_object")])
         else:
             return np.concatenate([robot_pos, robot_vel])

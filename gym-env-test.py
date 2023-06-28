@@ -19,12 +19,17 @@ def main():
     # reset the environment
     obs, info = env.reset()
     
+    high = True
     # render the environment
     while True:
-        for i in range(100):
-            action = env.action_space.sample()
+        for i in range(1000):
+            if i % 100 == 0:
+                high = not high
+            if high:
+                action = env.action_space.high
+            else:
+                action = env.action_space.low
             obs, reward, terminated, truncated, info = env.step(action)
-
 
         env.reset()
 
