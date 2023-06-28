@@ -104,23 +104,30 @@ class Workspace:
     try:
       obs, info = self.env.reset()
       action = self.env.action_space.sample()
-      reward = np.float32(-1.0)
+      reward = np.float32(0.0)
       terminated = False
       truncated = False
       episode_reward = 0
+      episode_dist_reward = 0
+      episode_ori_reward = 0
       time_step = {"observation": obs, "action": action, "reward": reward, "discount": 1.0, "truncated": truncated}
       self.replay_storage.add(time_step)
       for i in tqdm(range(self.policy.num_train_steps)):
         if terminated or truncated:
           self.writer.add_scalar("episode end reward", reward, i)
           self.writer.add_scalar("episode return", episode_reward, i)
+          self.writer.add_scalar("episode dist reward", episode_dist_reward, i)
+          self.writer.add_scalar("episode ori reward", episode_ori_reward, i)
           # Reset env
           time_step = self.env.reset()
           terminated = False
           truncated = False
+          reward = np.float32(0.0)
           time_step = {"observation": obs, "action": action, "reward": reward, "discount": 1.0, "truncated": truncated}
           self.replay_storage.add(time_step)
           episode_reward = 0
+          episode_dist_reward = 0
+          episode_ori_reward = 0
 
         # Evaluate
         if i  % self.policy.eval_frequency == 0:
@@ -132,6 +139,7 @@ class Workspace:
         with torch.no_grad(), utils.eval_mode(self.policy):
           action = self.policy.act(obs, i, eval_mode=False)
         action = self.scale_action(action)
+        action = action.astype(np.float32)
           
         # Update agent
         if i >= self.policy.num_seed_steps:
@@ -145,12 +153,16 @@ class Workspace:
 
         # Take env step
         obs, reward, terminated, truncated, info = self.env.step(action)
+        dist_reward = info["reward_dist"]
+        ori_reward = info["reward_ori"]
         reward = reward.astype(np.float32)
         if terminated:
           discount = 0.0
         else:
           discount = 1.0
         episode_reward += reward
+        episode_dist_reward += dist_reward
+        episode_ori_reward += ori_reward
         time_step = {"observation": obs, "action": action, "reward": reward, "discount": discount, "truncated": truncated}
         self.replay_storage.add(time_step)
 

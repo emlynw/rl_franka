@@ -51,7 +51,7 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         upright_orientation = np.array([1, 0, 0, 0])
         reward_ori = -np.linalg.norm(quat - upright_orientation)
 
-        reward = reward_dist + reward_ori
+        reward = reward_dist + 0.2*reward_ori
 
         self.do_simulation(a, self.frame_skip)
         if self.render_mode == "human":
