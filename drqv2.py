@@ -138,7 +138,7 @@ class drqv2Agent(nn.Module):
     self.discount = 0.99
     self.nstep = 3
     self.capacity = 60_000
-    self.num_train_steps = 1_000_000
+    self.num_train_steps = 500_000
     self.num_eval_episodes = 5
     self.eval_frequency = 10_000
     self.checkpoint_frequency = 20_000
