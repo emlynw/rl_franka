@@ -119,7 +119,7 @@ class Workspace:
           self.writer.add_scalar("episode dist reward", episode_dist_reward, i)
           self.writer.add_scalar("episode ori reward", episode_ori_reward, i)
           # Reset env
-          time_step = self.env.reset()
+          obs, info = self.env.reset()
           terminated = False
           truncated = False
           reward = np.float32(0.0)
