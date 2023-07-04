@@ -35,8 +35,8 @@ class Workspace:
     os.makedirs(cp_path, exist_ok=True)
     self.writer = SummaryWriter(log_dir=tb_path)
     self.frame_stack = 3
-    self.action_repeat = 2
-    self.ep_len = 1000
+    self.action_repeat = 4
+    self.ep_len = 250
   
     self.setup()
 

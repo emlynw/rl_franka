@@ -40,18 +40,18 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         target_pos = self.get_body_com("target_object")
         target_pos[2] += 0.1
         
-        vec = self.get_body_com("hand") - target_pos
+        vec = self.get_body_com("left_finger") - target_pos
         reward_dist = -np.linalg.norm(vec)
-        # reward_ctrl = -np.square(a).sum()
+        reward_ctrl = -np.square(a).sum()
 
-        # num_contacts = self.data.ncon
-        # contact_reward = -max(0,num_contacts-4)
+        num_contacts = self.data.ncon
+        contact_reward = -max(0,num_contacts-4)
         quat = self.data.xquat[10]
         quat = np.array([quat[0], quat[1], quat[2], quat[3]])
-        upright_orientation = np.array([1, 0, 0, 0])
+        upright_orientation = np.array([0, 1, 0, 0])
         reward_ori = -np.linalg.norm(quat - upright_orientation)
 
-        reward = reward_dist + 0.2*reward_ori
+        reward = reward_dist 
 
         self.do_simulation(a, self.frame_skip)
         if self.render_mode == "human":
@@ -93,6 +93,6 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         robot_pos = self.data.qpos[0:8].flat.copy()
         robot_vel = self.data.qvel[0:8].flat.copy()
         if self.use_distance:
-            return np.concatenate([robot_pos, robot_vel, self.get_body_com("hand") - self.get_body_com("target_object")])
+            return np.concatenate([robot_pos, robot_vel, self.get_body_com("left_finger") - self.get_body_com("target_object")])
         else:
             return np.concatenate([robot_pos, robot_vel])
