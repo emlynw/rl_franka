@@ -43,13 +43,13 @@ class RandomShiftsAug(nn.Module):
                              align_corners=False)
 
 class Encoder(nn.Module):
-    def __init__(self, obs_shape):
+    def __init__(self, pixel_shape):
         super().__init__()
 
-        assert len(obs_shape) == 3
+        assert len(pixel_shape) == 3
         self.repr_dim = 76832
 
-        self.convnet = nn.Sequential(nn.Conv2d(obs_shape[0], 32, 3, stride=2),
+        self.convnet = nn.Sequential(nn.Conv2d(pixel_shape[0], 32, 3, stride=2),
                                      nn.ReLU(), nn.Conv2d(32, 32, 3, stride=1),
                                      nn.ReLU(), nn.Conv2d(32, 32, 3, stride=1),
                                      nn.ReLU(), nn.Conv2d(32, 32, 3, stride=1),
@@ -64,13 +64,13 @@ class Encoder(nn.Module):
         return h
 
 class Actor(nn.Module):
-    def __init__(self, repr_dim, action_shape, feature_dim, hidden_dim):
+    def __init__(self, repr_dim, action_shape, feature_dim, state_dim, hidden_dim):
         super().__init__()
 
         self.trunk = nn.Sequential(nn.Linear(repr_dim, feature_dim),
                                    nn.LayerNorm(feature_dim), nn.Tanh())
 
-        self.policy = nn.Sequential(nn.Linear(feature_dim, hidden_dim),
+        self.policy = nn.Sequential(nn.Linear(feature_dim + state_dim, hidden_dim),
                                     nn.ReLU(inplace=True),
                                     nn.Linear(hidden_dim, hidden_dim),
                                     nn.ReLU(inplace=True),
@@ -78,9 +78,9 @@ class Actor(nn.Module):
 
         self.apply(utils.weight_init)
 
-    def forward(self, obs, std):
-        h = self.trunk(obs)
-
+    def forward(self, embs, states, std):
+        h = self.trunk(embs)
+        h = torch.cat([h, states], dim=-1)
         mu = self.policy(h)
         mu = torch.tanh(mu)
         std = torch.ones_like(mu) * std
@@ -89,27 +89,27 @@ class Actor(nn.Module):
         return dist
     
 class Critic(nn.Module):
-    def __init__(self, repr_dim, action_shape, feature_dim, hidden_dim):
+    def __init__(self, repr_dim, action_shape, feature_dim, state_dim, hidden_dim):
         super().__init__()
 
         self.trunk = nn.Sequential(nn.Linear(repr_dim, feature_dim),
                                    nn.LayerNorm(feature_dim), nn.Tanh())
 
         self.Q1 = nn.Sequential(
-            nn.Linear(feature_dim + action_shape[0], hidden_dim),
+            nn.Linear(feature_dim + state_dim + action_shape[0], hidden_dim),
             nn.ReLU(inplace=True), nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(inplace=True), nn.Linear(hidden_dim, 1))
 
         self.Q2 = nn.Sequential(
-            nn.Linear(feature_dim + action_shape[0], hidden_dim),
+            nn.Linear(feature_dim+ state_dim + action_shape[0], hidden_dim),
             nn.ReLU(inplace=True), nn.Linear(hidden_dim, hidden_dim),
             nn.ReLU(inplace=True), nn.Linear(hidden_dim, 1))
 
         self.apply(utils.weight_init)
 
-    def forward(self, obs, action):
-        h = self.trunk(obs)
-        h_action = torch.cat([h, action], dim=-1)
+    def forward(self, embs, states, action):
+        h = self.trunk(embs)
+        h_action = torch.cat([h, states, action], dim=-1)
         q1 = self.Q1(h_action)
         q2 = self.Q2(h_action)
 
@@ -119,9 +119,10 @@ class Critic(nn.Module):
 class drqv2Agent(nn.Module):
   """Soft-Actor-Critic."""
 
-  def __init__(self, device, obs_shape, action_shape):
+  def __init__(self, device, pixel_dim, state_dim, action_shape):
     super().__init__()
-    self.obs_shape = obs_shape
+    self.pixel_dim = pixel_dim
+    self.state_dim = state_dim
     self.action_shape = action_shape
     self.device = device
     self.lr = 1e-4
@@ -146,14 +147,14 @@ class drqv2Agent(nn.Module):
     self.batch_size = 256
       
     # models
-    self.encoder = Encoder(self.obs_shape).to(device)
+    self.encoder = Encoder(self.pixel_dim).to(device)
     self.actor = Actor(self.encoder.repr_dim, self.action_shape, self.feature_dim,
-                        self.hidden_dim).to(device)
+                        self.state_dim, self.hidden_dim).to(device)
 
     self.critic = Critic(self.encoder.repr_dim, self.action_shape, self.feature_dim,
-                          self.hidden_dim).to(device)
-    self.critic_target = Critic(self.encoder.repr_dim, self.action_shape,
-                                self.feature_dim, self.hidden_dim).to(device)
+                          self.state_dim, self.hidden_dim).to(device)
+    self.critic_target = Critic(self.encoder.repr_dim, self.action_shape, self.feature_dim, 
+                                self.state_dim, self.hidden_dim).to(device)
     self.critic_target.load_state_dict(self.critic.state_dict())
     # Optimizers.
     self.encoder_opt = torch.optim.Adam(self.encoder.parameters(), lr=self.lr)
@@ -171,11 +172,12 @@ class drqv2Agent(nn.Module):
     self.actor.train(training)
     self.critic.train(training)
 
-  def act(self, obs, step, eval_mode):
-      obs = torch.as_tensor(obs, device=self.device)
-      obs = self.encoder(obs.unsqueeze(0))
+  def act(self, pixels, states, step, eval_mode):
+      pixels = torch.as_tensor(pixels, device=self.device)
+      states = torch.as_tensor(states, device=self.device)
+      embs = self.encoder(pixels.unsqueeze(0))
       stddev = utils.schedule(self.stddev_schedule, step)
-      dist = self.actor(obs, stddev)
+      dist = self.actor(embs, states, stddev)
       if eval_mode:
           action = dist.mean
       else:
@@ -249,26 +251,26 @@ class drqv2Agent(nn.Module):
         return metrics
 
     batch = next(replay_iter)
-    obs, action, reward, discount, next_obs = utils.to_torch(
+    pixels, states, action, reward, discount, next_pixels, next_states = utils.to_torch(
         batch, self.device)
 
     # augment
-    obs = self.aug(obs.float())
-    next_obs = self.aug(next_obs.float())
+    pixels = self.aug(pixels.float())
+    next_pixels = self.aug(next_pixels.float())
     # encode
-    obs = self.encoder(obs)
+    embs = self.encoder(pixels)
     with torch.no_grad():
-        next_obs = self.encoder(next_obs)
+        next_embs = self.encoder(next_pixels)
 
     if self.use_tb:
         metrics['batch_reward'] = reward.mean().item()
 
     # update critic
     metrics.update(
-        self.update_critic(obs, action, reward, discount, next_obs, step))
+        self.update_critic(embs, states, action, reward, discount, next_embs, next_states, step))
 
     # update actor
-    metrics.update(self.update_actor(obs.detach(), step))
+    metrics.update(self.update_actor(embs.detach(), states.detach(), step))
 
     # update critic target
     utils.soft_update_params(self.critic, self.critic_target,

@@ -37,6 +37,10 @@ class Workspace:
     self.frame_stack = 3
     self.action_repeat = 4
     self.ep_len = 250
+    self.min_pos = np.array([-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973, 0])
+    self.max_pos = np.array([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973, 0.04])
+    self.min_vel = -np.array([2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100, 1.0])
+    self.max_vel = np.array([2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100, 1.0])
   
     self.setup()
 
@@ -54,6 +58,8 @@ class Workspace:
         self.policy.batch_size, 1,
         False, 3, self.policy.discount)
     self._replay_iter = None
+
+    
 
   @property
   def replay_iter(self):
@@ -77,7 +83,7 @@ class Workspace:
   def eval(self, i):
     stats = collections.defaultdict(list)
     for j in range(self.policy.num_eval_episodes):
-      obs, info = self.eval_env.reset()
+      obs,  = self.eval_env.reset()
       pixels = obs['pixels']
       states = obs['state']
       terminated = False
@@ -89,7 +95,7 @@ class Workspace:
           action = self.scale_action(action)
         obs, reward, terminated, truncated, info = self.eval_env.step(action)
         pixels = obs['pixels']
-        tates = obs['state']
+        states = obs['state']
         total_reward += reward
       end_reward = reward
       stats["end_reward"].append(end_reward)
@@ -103,6 +109,14 @@ class Workspace:
     range = high - low
     a = (range/2.0)*(a+1.0) + low
     return a
+  
+  def scale_states(self, states):
+    robot_pos = states[0:8]
+    robot_pos = (2.0/(self.max_pos-self.min_pos)*(robot_pos-self.min_pos))-1.0
+    robot_vel = states[8:16]
+    robot_vel = (2.0/(self.max_vel-self.min_vel)*(robot_vel-self.min_vel))-1.0
+    states = np.concatenate((robot_pos, robot_vel))
+    return states
   
   def train(self):
     try:
@@ -126,10 +140,12 @@ class Workspace:
           self.writer.add_scalar("episode ori reward", episode_ori_reward, i)
           # Reset env
           obs, info = self.env.reset()
+          pixels = obs['pixels']
+          states = obs['state']
           terminated = False
           truncated = False
           reward = np.float32(0.0)
-          time_step = {"observation": obs, "action": action, "reward": reward, "discount": 1.0, "truncated": truncated}
+          time_step = {"pixels": pixels, "states": states, "action": action, "reward": reward, "discount": 1.0, "truncated": truncated}
           self.replay_storage.add(time_step)
           episode_reward = 0
           episode_dist_reward = 0
@@ -143,7 +159,7 @@ class Workspace:
 
         # Sample action
         with torch.no_grad(), utils.eval_mode(self.policy):
-          action = self.policy.act(obs, i, eval_mode=False)
+          action = self.policy.act(pixels, states, i, eval_mode=False)
         action = self.scale_action(action)
         action = action.astype(np.float32)
           
@@ -159,6 +175,8 @@ class Workspace:
 
         # Take env step
         obs, reward, terminated, truncated, info = self.env.step(action)
+        pixels = obs['pixels']
+        states = obs['state']
         dist_reward = info["reward_dist"]
         ori_reward = info["reward_ori"]
         reward = reward.astype(np.float32)
@@ -169,7 +187,7 @@ class Workspace:
         episode_reward += reward
         episode_dist_reward += dist_reward
         episode_ori_reward += ori_reward
-        time_step = {"observation": obs, "action": action, "reward": reward, "discount": discount, "truncated": truncated}
+        time_step = {"pixels": pixels, "states": states, "action": action, "reward": reward, "discount": discount, "truncated": truncated}
         self.replay_storage.add(time_step)
 
 

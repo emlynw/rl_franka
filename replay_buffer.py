@@ -143,9 +143,11 @@ class ReplayBuffer(IterableDataset):
         episode = self._sample_episode()
         # add +1 for the first dummy transition
         idx = np.random.randint(0, episode_len(episode) - self._nstep + 1) + 1
-        obs = episode['observation'][idx - 1]
+        pixels = episode['pixels'][idx - 1]
+        states = episode['states'][idx - 1]
         action = episode['action'][idx]
-        next_obs = episode['observation'][idx + self._nstep - 1]
+        next_pixels = episode['pixels'][idx + self._nstep - 1]
+        next_states = episode['states'][idx + self._nstep - 1]
         reward = np.zeros_like(episode['reward'][idx])
         discount = np.ones_like(episode['discount'][idx])
         for i in range(self._nstep):
@@ -153,7 +155,7 @@ class ReplayBuffer(IterableDataset):
             reward += discount * step_reward
             discount *= episode['discount'][idx + i] * self._discount
         discount = discount.astype(np.float32)
-        return (obs, action, reward, discount, next_obs)
+        return (pixels, states, action, reward, discount, next_pixels, next_states)
 
     def __iter__(self):
         while True:

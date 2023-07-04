@@ -45,13 +45,13 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         reward_ctrl = -np.square(a).sum()
 
         num_contacts = self.data.ncon
-        contact_reward = -max(0,num_contacts-4)
+        reward_cont = -max(0,num_contacts-4)
         quat = self.data.xquat[10]
         quat = np.array([quat[0], quat[1], quat[2], quat[3]])
         upright_orientation = np.array([0, 1, 0, 0])
         reward_ori = -np.linalg.norm(quat - upright_orientation)
 
-        reward = reward_dist 
+        reward = reward_dist + 0.2*reward_cont
 
         self.do_simulation(a, self.frame_skip)
         if self.render_mode == "human":

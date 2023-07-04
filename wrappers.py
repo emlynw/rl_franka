@@ -14,7 +14,7 @@ class FrameStackWrapper(gym.Wrapper):
         self._state_shape = env.observation_space['state'].shape
         self._pixel_frames = deque([], maxlen=num_frames)
         self._state_frames = deque([], maxlen=num_frames)
-        self.observation_space = Dict({"state": Box(low=-np.inf, high=np.inf, shape=(num_frames, *self._state_shape), dtype=np.float32),
+        self.observation_space = Dict({"state": Box(low=-np.inf, high=np.inf, shape=self._state_shape, dtype=np.float32),
                                        "pixels": Box(low=0, high=255, shape=(num_frames*pixels_shape[-1], *pixels_shape[:-1]), dtype=np.uint8)})
         self.action_space = env.action_space
 
@@ -22,27 +22,19 @@ class FrameStackWrapper(gym.Wrapper):
     def step(self, action):
 
         obs, reward, terminated, truncated, info = self._env.step(action)
-        state = obs['state']
         pixels = obs['pixels']
-        self._state_frames.append(state)
         self._pixel_frames.append(pixels)
-        stacked_states = np.array(list(self._state_frames))
         stacked_pixels = np.array(list(self._pixel_frames))
-        obs['state'] = stacked_states
         obs['pixels'] = stacked_pixels
 
         return obs, reward, terminated, truncated, info
     
     def reset(self):
         obs, info = self._env.reset()
-        state = obs['state']
         pixels = obs['pixels']
         for _ in range(self._num_frames):
-            self._state_frames.append(state)
             self._pixel_frames.append(pixels)
-        stacked_states = np.array(list(self._state_frames))
         stacked_pixels = np.array(list(self._pixel_frames))
-        obs['state'] = stacked_states
         obs['pixels'] = stacked_pixels
         
         return obs, info
