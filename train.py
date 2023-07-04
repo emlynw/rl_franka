@@ -68,7 +68,7 @@ class Workspace:
       env = ActionRepeat(env, action_repeat)
     if record:
       env = VideoRecorder(env, save_dir=video_dir, crop_resolution=480, resize_resolution=224)
-    env = PixelObservationWrapper(env, pixels_only=True)
+    env = PixelObservationWrapper(env, pixels_only=False)
     env = CustomObservation(env, crop_resolution=480, resize_resolution=112)
     env = FrameStackWrapper(env, frame_stack)
 
@@ -78,14 +78,18 @@ class Workspace:
     stats = collections.defaultdict(list)
     for j in range(self.policy.num_eval_episodes):
       obs, info = self.eval_env.reset()
+      pixels = obs['pixels']
+      states = obs['state']
       terminated = False
       truncated = False
       total_reward = 0
       while not (terminated or truncated):
         with torch.no_grad(), utils.eval_mode(self.policy):
-          action = self.policy.act(obs, i, eval_mode=True)
+          action = self.policy.act(pixels, states, i, eval_mode=True)
           action = self.scale_action(action)
         obs, reward, terminated, truncated, info = self.eval_env.step(action)
+        pixels = obs['pixels']
+        tates = obs['state']
         total_reward += reward
       end_reward = reward
       stats["end_reward"].append(end_reward)
@@ -103,6 +107,8 @@ class Workspace:
   def train(self):
     try:
       obs, info = self.env.reset()
+      pixels = obs['pixels']
+      states = obs['state']
       action = self.env.action_space.sample()
       reward = np.float32(0.0)
       terminated = False
@@ -110,7 +116,7 @@ class Workspace:
       episode_reward = 0
       episode_dist_reward = 0
       episode_ori_reward = 0
-      time_step = {"observation": obs, "action": action, "reward": reward, "discount": 1.0, "truncated": truncated}
+      time_step = {"pixels": pixels, "states": states, "action": action, "reward": reward, "discount": 1.0, "truncated": truncated}
       self.replay_storage.add(time_step)
       for i in tqdm(range(self.policy.num_train_steps)):
         if terminated or truncated:
@@ -119,7 +125,7 @@ class Workspace:
           self.writer.add_scalar("episode dist reward", episode_dist_reward, i)
           self.writer.add_scalar("episode ori reward", episode_ori_reward, i)
           # Reset env
-          time_step = self.env.reset()
+          obs, info = self.env.reset()
           terminated = False
           truncated = False
           reward = np.float32(0.0)

@@ -7,42 +7,46 @@ import imageio
 import os
 
 class FrameStackWrapper(gym.Wrapper):
-    def __init__(self, env, num_frames):
-        super().__init__(env)
+    def __init__(self, env, num_frames=3):
+        self._env = env
         self._num_frames = num_frames
-        self._frames = deque([], maxlen=num_frames)
-        pixels_shape = env.observation_space.shape
-        
+        pixels_shape = env.observation_space['pixels'].shape
+        self._state_shape = env.observation_space['state'].shape
+        self._pixel_frames = deque([], maxlen=num_frames)
+        self._state_frames = deque([], maxlen=num_frames)
+        self.observation_space = Dict({"state": Box(low=-np.inf, high=np.inf, shape=(num_frames, *self._state_shape), dtype=np.float32),
+                                       "pixels": Box(low=0, high=255, shape=(num_frames*pixels_shape[-1], *pixels_shape[:-1]), dtype=np.uint8)})
+        self.action_space = env.action_space
 
-        # remove batch dim
-        if len(pixels_shape) == 4:
-            pixels_shape = pixels_shape[1:]
-        self.observation_space = Box(low=0, high=255, shape=(num_frames*pixels_shape[-1], *pixels_shape[:-1]), dtype=np.uint8)
-
-    def _transform_observation(self, obs):
-        assert len(self._frames) == self._num_frames
-        obs = np.concatenate(list(self._frames), axis=0)
-        return obs
-
-    def _extract_pixels(self, obs):
-        pixels = obs["pixels"]
-        # remove batch dim
-        if len(pixels.shape) == 4:
-            pixels = pixels[0]
-        return pixels.transpose(2, 0, 1).copy()
-
-    def reset(self):
-        obs, info = self.env.reset()
-        pixels = self._extract_pixels(obs)
-        for _ in range(self._num_frames):
-            self._frames.append(pixels)
-        return self._transform_observation(obs), info
 
     def step(self, action):
-        obs, reward, terminated, truncated, info = self.env.step(action)
-        pixels = self._extract_pixels(obs)
-        self._frames.append(pixels)
-        return self._transform_observation(obs), reward, terminated, truncated, info
+
+        obs, reward, terminated, truncated, info = self._env.step(action)
+        state = obs['state']
+        pixels = obs['pixels']
+        self._state_frames.append(state)
+        self._pixel_frames.append(pixels)
+        stacked_states = np.array(list(self._state_frames))
+        stacked_pixels = np.array(list(self._pixel_frames))
+        obs['state'] = stacked_states
+        obs['pixels'] = stacked_pixels
+
+        return obs, reward, terminated, truncated, info
+    
+    def reset(self):
+        obs, info = self._env.reset()
+        state = obs['state']
+        pixels = obs['pixels']
+        for _ in range(self._num_frames):
+            self._state_frames.append(state)
+            self._pixel_frames.append(pixels)
+        stacked_states = np.array(list(self._state_frames))
+        stacked_pixels = np.array(list(self._pixel_frames))
+        obs['state'] = stacked_states
+        obs['pixels'] = stacked_pixels
+        
+        return obs, info
+
 
     
 class CustomObservation(gym.ObservationWrapper):
@@ -59,7 +63,9 @@ class CustomObservation(gym.ObservationWrapper):
       self.resize_resolution = env.observation_space["pixels"].shape[:2]
     self.crop_resolution = crop_resolution
     self.resize_resolution = resize_resolution
-    self.observation_space = Box(low=0, high=255, shape=(*self.resize_resolution, 3), dtype=np.uint8)
+    self._state_shape = env.observation_space['state'].shape
+    self.observation_space = Dict({"state": Box(low=-np.inf, high=np.inf, shape=self._state_shape, dtype=np.float32),
+                                       "pixels": Box(low=0, high=255, shape=(*self.resize_resolution, 3), dtype=np.uint8)})
     
   def observation(self, observation):
     if self.crop_resolution is not None:
