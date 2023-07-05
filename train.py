@@ -47,7 +47,7 @@ class Workspace:
   def setup(self):
     self.env = self.create_environment(name="gym_INB0104/INB0104-v0",frame_stack=self.frame_stack, action_repeat=self.action_repeat)
     self.eval_env = self.create_environment(name="gym_INB0104/INB0104-v0", frame_stack=self.frame_stack, action_repeat=self.action_repeat, record=True)
-    self.policy = drqv2Agent(self.device, self.env.observation_space.shape, self.env.action_space.shape)
+    self.policy = drqv2Agent(self.device, self.env.observation_space['pixels'].shape, self.env.observation_space['state'].shape[0], self.env.action_space.shape)
     # create replay buffer
     self.work_dir = Path.cwd()
 
@@ -77,32 +77,7 @@ class Workspace:
     env = PixelObservationWrapper(env, pixels_only=False)
     env = CustomObservation(env, crop_resolution=480, resize_resolution=112)
     env = FrameStackWrapper(env, frame_stack)
-
     return env
-
-  def eval(self, i):
-    stats = collections.defaultdict(list)
-    for j in range(self.policy.num_eval_episodes):
-      obs,  = self.eval_env.reset()
-      pixels = obs['pixels']
-      states = obs['state']
-      terminated = False
-      truncated = False
-      total_reward = 0
-      while not (terminated or truncated):
-        with torch.no_grad(), utils.eval_mode(self.policy):
-          action = self.policy.act(pixels, states, i, eval_mode=True)
-          action = self.scale_action(action)
-        obs, reward, terminated, truncated, info = self.eval_env.step(action)
-        pixels = obs['pixels']
-        states = obs['state']
-        total_reward += reward
-      end_reward = reward
-      stats["end_reward"].append(end_reward)
-      stats["episode_reward"].append(total_reward)
-    for k, v in stats.items():
-      stats[k] = np.mean(v)
-    return stats
   
   def scale_action(self, a):
     low, high = self.env.action_space.low, self.env.action_space.high
@@ -116,13 +91,43 @@ class Workspace:
     robot_vel = states[8:16]
     robot_vel = (2.0/(self.max_vel-self.min_vel)*(robot_vel-self.min_vel))-1.0
     states = np.concatenate((robot_pos, robot_vel))
+    states = states.astype(np.float32)
     return states
+
+  def eval(self, i):
+    stats = collections.defaultdict(list)
+    for j in range(self.policy.num_eval_episodes):
+      obs, info = self.eval_env.reset()
+      pixels = obs['pixels']
+      states = obs['state']
+      states = self.scale_states(states)
+      terminated = False
+      truncated = False
+      total_reward = 0
+      while not (terminated or truncated):
+        with torch.no_grad(), utils.eval_mode(self.policy):
+          action = self.policy.act(pixels, states, i, eval_mode=True)
+          action = self.scale_action(action)
+        obs, reward, terminated, truncated, info = self.eval_env.step(action)
+        pixels = obs['pixels']
+        states = obs['state']
+        states = states.astype(np.float32)
+        states = self.scale_states(states)
+        total_reward += reward
+      end_reward = reward
+      stats["end_reward"].append(end_reward)
+      stats["episode_reward"].append(total_reward)
+    for k, v in stats.items():
+      stats[k] = np.mean(v)
+    return stats
   
   def train(self):
     try:
       obs, info = self.env.reset()
       pixels = obs['pixels']
       states = obs['state']
+      states = states.astype(np.float32)
+      states = self.scale_states(states)
       action = self.env.action_space.sample()
       reward = np.float32(0.0)
       terminated = False
@@ -142,6 +147,8 @@ class Workspace:
           obs, info = self.env.reset()
           pixels = obs['pixels']
           states = obs['state']
+          states = states.astype(np.float32)
+          states = self.scale_states(states)
           terminated = False
           truncated = False
           reward = np.float32(0.0)
@@ -177,6 +184,8 @@ class Workspace:
         obs, reward, terminated, truncated, info = self.env.step(action)
         pixels = obs['pixels']
         states = obs['state']
+        states = states.astype(np.float32)
+        states = self.scale_states(states)
         dist_reward = info["reward_dist"]
         ori_reward = info["reward_ori"]
         reward = reward.astype(np.float32)

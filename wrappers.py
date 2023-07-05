@@ -8,36 +8,39 @@ import os
 
 class FrameStackWrapper(gym.Wrapper):
     def __init__(self, env, num_frames=3):
-        self._env = env
+        super().__init__(env)
         self._num_frames = num_frames
         pixels_shape = env.observation_space['pixels'].shape
         self._state_shape = env.observation_space['state'].shape
         self._pixel_frames = deque([], maxlen=num_frames)
-        self._state_frames = deque([], maxlen=num_frames)
         self.observation_space = Dict({"state": Box(low=-np.inf, high=np.inf, shape=self._state_shape, dtype=np.float32),
                                        "pixels": Box(low=0, high=255, shape=(num_frames*pixels_shape[-1], *pixels_shape[:-1]), dtype=np.uint8)})
         self.action_space = env.action_space
 
+    def _transform_observation(self, obs):
+        assert len(self._pixel_frames) == self._num_frames
+        obs['pixels'] = np.concatenate(list(self._pixel_frames), axis=0)
+        return obs
 
-    def step(self, action):
-
-        obs, reward, terminated, truncated, info = self._env.step(action)
-        pixels = obs['pixels']
-        self._pixel_frames.append(pixels)
-        stacked_pixels = np.array(list(self._pixel_frames))
-        obs['pixels'] = stacked_pixels
-
-        return obs, reward, terminated, truncated, info
+    def _extract_pixels(self, obs):
+        pixels = obs["pixels"]
+        # remove batch dim
+        if len(pixels.shape) == 4:
+            pixels = pixels[0]
+        return pixels.transpose(2, 0, 1).copy()
     
+    def step(self, action):
+        obs, reward, terminated, truncated, info = self.env.step(action)
+        pixels = self._extract_pixels(obs)
+        self._pixel_frames.append(pixels)
+        return self._transform_observation(obs), reward, terminated, truncated, info
+
     def reset(self):
-        obs, info = self._env.reset()
-        pixels = obs['pixels']
+        obs, info = self.env.reset()
+        pixels = self._extract_pixels(obs)
         for _ in range(self._num_frames):
             self._pixel_frames.append(pixels)
-        stacked_pixels = np.array(list(self._pixel_frames))
-        obs['pixels'] = stacked_pixels
-        
-        return obs, info
+        return self._transform_observation(obs), info
 
 
     

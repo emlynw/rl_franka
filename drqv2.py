@@ -129,7 +129,7 @@ class drqv2Agent(nn.Module):
     self.feature_dim = 50
     self.hidden_dim = 1024
     self.critic_target_tau = 0.01
-    self.num_expl_steps = 2000
+    self.num_expl_steps = 3000
     self.num_seed_steps = 4000
     self.update_every_steps = 2
     self.stddev_schedule = 1.0
@@ -139,7 +139,7 @@ class drqv2Agent(nn.Module):
     self.discount = 0.99
     self.nstep = 3
     self.capacity = 60_000
-    self.num_train_steps = 1_000_000
+    self.num_train_steps = 500_000
     self.num_eval_episodes = 5
     self.eval_frequency = 10_000
     self.checkpoint_frequency = 20_000
@@ -175,6 +175,7 @@ class drqv2Agent(nn.Module):
   def act(self, pixels, states, step, eval_mode):
       pixels = torch.as_tensor(pixels, device=self.device)
       states = torch.as_tensor(states, device=self.device)
+      states = states.unsqueeze(0)
       embs = self.encoder(pixels.unsqueeze(0))
       stddev = utils.schedule(self.stddev_schedule, step)
       dist = self.actor(embs, states, stddev)
@@ -186,7 +187,7 @@ class drqv2Agent(nn.Module):
               action.uniform_(-1.0, 1.0)
       return action.cpu().numpy()[0]
 
-  def update_critic(self, obs, action, reward, discount, next_obs, step):
+  def update_critic(self, embs, states, action, reward, discount, next_embs, next_states, step):
     metrics = dict()
 
     reward = reward.unsqueeze(-1)
@@ -195,13 +196,13 @@ class drqv2Agent(nn.Module):
 
     with torch.no_grad():
         stddev = utils.schedule(self.stddev_schedule, step)
-        dist = self.actor(next_obs, stddev)
+        dist = self.actor(next_embs, next_states, stddev)
         next_action = dist.sample(clip=self.stddev_clip)
-        target_Q1, target_Q2 = self.critic_target(next_obs, next_action)
+        target_Q1, target_Q2 = self.critic_target(next_embs, next_states, next_action)
         target_V = torch.min(target_Q1, target_Q2)
         target_Q = reward + (discount * target_V)
 
-    Q1, Q2 = self.critic(obs, action)
+    Q1, Q2 = self.critic(embs, states, action)
     critic_loss = F.mse_loss(Q1, target_Q) + F.mse_loss(Q2, target_Q)
 
 
@@ -220,14 +221,14 @@ class drqv2Agent(nn.Module):
 
     return metrics
 
-  def update_actor(self, obs, step):
+  def update_actor(self, embs, states, step):
     metrics = dict()
 
     stddev = utils.schedule(self.stddev_schedule, step)
-    dist = self.actor(obs, stddev)
+    dist = self.actor(embs, states, stddev)
     action = dist.sample(clip=self.stddev_clip)
     log_prob = dist.log_prob(action).sum(-1, keepdim=True)
-    Q1, Q2 = self.critic(obs, action)
+    Q1, Q2 = self.critic(embs, states, action)
     Q = torch.min(Q1, Q2)
 
     actor_loss = -Q.mean()
