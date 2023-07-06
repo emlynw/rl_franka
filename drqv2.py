@@ -131,7 +131,7 @@ class drqv2Agent(nn.Module):
     self.critic_target_tau = 0.01
     self.num_expl_steps = 3000
     self.num_seed_steps = 4000
-    self.update_every_steps = 2
+    self.update_every_steps = 1
     self.stddev_schedule = 1.0
     self.stddev_clip = 0.3
     self.use_tb = True
@@ -145,6 +145,7 @@ class drqv2Agent(nn.Module):
     self.checkpoint_frequency = 20_000
     self.log_frequency = 1_000
     self.batch_size = 256
+    self.utd = 1
       
     # models
     self.encoder = Encoder(self.pixel_dim).to(device)
@@ -250,32 +251,34 @@ class drqv2Agent(nn.Module):
 
     if step % self.update_every_steps != 0:
         return metrics
+    
+    for i in range(self.utd):
 
-    batch = next(replay_iter)
-    pixels, states, action, reward, discount, next_pixels, next_states = utils.to_torch(
-        batch, self.device)
+        batch = next(replay_iter)
+        pixels, states, action, reward, discount, next_pixels, next_states = utils.to_torch(
+            batch, self.device)
 
-    # augment
-    pixels = self.aug(pixels.float())
-    next_pixels = self.aug(next_pixels.float())
-    # encode
-    embs = self.encoder(pixels)
-    with torch.no_grad():
-        next_embs = self.encoder(next_pixels)
+        # augment
+        pixels = self.aug(pixels.float())
+        next_pixels = self.aug(next_pixels.float())
+        # encode
+        embs = self.encoder(pixels)
+        with torch.no_grad():
+            next_embs = self.encoder(next_pixels)
 
-    if self.use_tb:
-        metrics['batch_reward'] = reward.mean().item()
+        if self.use_tb:
+            metrics['batch_reward'] = reward.mean().item()
 
-    # update critic
-    metrics.update(
-        self.update_critic(embs, states, action, reward, discount, next_embs, next_states, step))
+        # update critic
+        metrics.update(
+            self.update_critic(embs, states, action, reward, discount, next_embs, next_states, step))
 
-    # update actor
-    metrics.update(self.update_actor(embs.detach(), states.detach(), step))
+        # update actor
+        metrics.update(self.update_actor(embs.detach(), states.detach(), step))
 
-    # update critic target
-    utils.soft_update_params(self.critic, self.critic_target,
-                              self.critic_target_tau)
+        # update critic target
+        utils.soft_update_params(self.critic, self.critic_target,
+                                self.critic_target_tau)
 
     return metrics
 
