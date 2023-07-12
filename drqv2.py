@@ -89,7 +89,7 @@ class Actor(nn.Module):
         return dist
     
 class Critic(nn.Module):
-    def __init__(self, repr_dim, action_shape, feature_dim, state_dim, hidden_dim):
+    def __init__(self, repr_dim, action_shape, feature_dim, state_dim, hidden_dim, dropout=0.01):
         super().__init__()
 
         self.trunk = nn.Sequential(nn.Linear(repr_dim, feature_dim),
@@ -97,12 +97,14 @@ class Critic(nn.Module):
 
         self.Q1 = nn.Sequential(
             nn.Linear(feature_dim + state_dim + action_shape[0], hidden_dim),
-            nn.ReLU(inplace=True), nn.Linear(hidden_dim, hidden_dim),
+            nn.Dropout(p=dropout), nn.LayerNorm(hidden_dim), nn.ReLU(inplace=True), 
+            nn.Linear(hidden_dim, hidden_dim), nn.Dropout(p=dropout), nn.LayerNorm(hidden_dim),
             nn.ReLU(inplace=True), nn.Linear(hidden_dim, 1))
 
         self.Q2 = nn.Sequential(
-            nn.Linear(feature_dim+ state_dim + action_shape[0], hidden_dim),
-            nn.ReLU(inplace=True), nn.Linear(hidden_dim, hidden_dim),
+            nn.Linear(feature_dim + state_dim + action_shape[0], hidden_dim),
+            nn.Dropout(p=dropout), nn.LayerNorm(hidden_dim), nn.ReLU(inplace=True), 
+            nn.Linear(hidden_dim, hidden_dim), nn.Dropout(p=dropout), nn.LayerNorm(hidden_dim),
             nn.ReLU(inplace=True), nn.Linear(hidden_dim, 1))
 
         self.apply(utils.weight_init)
@@ -139,13 +141,14 @@ class drqv2Agent(nn.Module):
     self.discount = 0.99
     self.nstep = 3
     self.capacity = 60_000
-    self.num_train_steps = 500_000
+    self.num_train_steps = 200_000
     self.num_eval_episodes = 5
     self.eval_frequency = 10_000
     self.checkpoint_frequency = 20_000
     self.log_frequency = 1_000
     self.batch_size = 256
-    self.utd = 1
+    self.dropout = 0.01
+    self.utd = 2
       
     # models
     self.encoder = Encoder(self.pixel_dim).to(device)
@@ -230,7 +233,7 @@ class drqv2Agent(nn.Module):
     action = dist.sample(clip=self.stddev_clip)
     log_prob = dist.log_prob(action).sum(-1, keepdim=True)
     Q1, Q2 = self.critic(embs, states, action)
-    Q = torch.min(Q1, Q2)
+    Q = torch.cat((Q1, Q2))
 
     actor_loss = -Q.mean()
 
@@ -273,12 +276,14 @@ class drqv2Agent(nn.Module):
         metrics.update(
             self.update_critic(embs, states, action, reward, discount, next_embs, next_states, step))
 
-        # update actor
-        metrics.update(self.update_actor(embs.detach(), states.detach(), step))
-
         # update critic target
         utils.soft_update_params(self.critic, self.critic_target,
                                 self.critic_target_tau)
+        
+    # update actor
+    batch = next(replay_iter)
+    pixels, states, action, reward, discount, next_pixels, next_states = utils.to_torch(batch, self.device)
+    metrics.update(self.update_actor(embs.detach(), states.detach(), step))
 
     return metrics
 
