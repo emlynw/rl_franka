@@ -148,7 +148,7 @@ class drqv2Agent(nn.Module):
     self.log_frequency = 1_000
     self.batch_size = 256
     self.dropout = 0.01
-    self.utd = 2
+    self.utd = 1
       
     # models
     self.encoder = Encoder(self.pixel_dim).to(device)
@@ -281,8 +281,6 @@ class drqv2Agent(nn.Module):
                                 self.critic_target_tau)
         
     # update actor
-    batch = next(replay_iter)
-    pixels, states, action, reward, discount, next_pixels, next_states = utils.to_torch(batch, self.device)
     metrics.update(self.update_actor(embs.detach(), states.detach(), step))
 
     return metrics

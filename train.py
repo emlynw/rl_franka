@@ -21,19 +21,12 @@ from wrappers import ActionRepeat, VideoRecorder, CustomObservation, FrameStackW
 import gym_INB0104
 from gymnasium.spaces import Box, Dict
 import utils
+import wandb
 
 class Workspace:
   def __init__(self):
     self.device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
     self.num_gpus = torch.cuda.device_count()
-    cwd = os.getcwd()
-    workdir = Path.cwd()
-    self.work_dir = workdir
-    tb_path = os.path.join(cwd, 'tb')
-    cp_path = os.path.join(cwd, 'checkpoints')
-    os.makedirs(tb_path, exist_ok=True)
-    os.makedirs(cp_path, exist_ok=True)
-    self.writer = SummaryWriter(log_dir=tb_path)
     self.frame_stack = 3
     self.action_repeat = 4
     self.ep_len = 250
@@ -48,18 +41,33 @@ class Workspace:
     self.env = self.create_environment(name="gym_INB0104/INB0104-v0",frame_stack=self.frame_stack, action_repeat=self.action_repeat)
     self.eval_env = self.create_environment(name="gym_INB0104/INB0104-v0", frame_stack=self.frame_stack, action_repeat=self.action_repeat, record=True)
     self.policy = drqv2Agent(self.device, self.env.observation_space['pixels'].shape, self.env.observation_space['state'].shape[0], self.env.action_space.shape)
+
+    # Setup logging
+    os.environ["WANDB_SILENT"] = "true"
+    cwd = os.getcwd()
+    tb_path = os.path.join(cwd, 'tb')
+    cp_path = os.path.join(cwd, 'checkpoints')
+    os.makedirs(tb_path, exist_ok=True)
+    os.makedirs(cp_path, exist_ok=True)
+    config = {
+      "architecture": "drqv2-robot_states-droq",
+      "utd": self.policy.utd,
+      "nstep": self.policy.nstep,
+      "replay buffer capacity": self.policy.capacity,
+      "batch_size": self.policy.batch_size,
+      "dropout": self.policy.dropout,
+    }
+    wandb.init(project="franka_rl", sync_tensorboard=True, config=config)
+    self.writer = SummaryWriter(log_dir=tb_path)
+
     # create replay buffer
     self.work_dir = Path.cwd()
-
     self.replay_storage = ReplayBufferStorage(self.work_dir / 'buffer')
-
     self.replay_loader = make_replay_loader(
         self.work_dir / 'buffer', self.policy.capacity,
         self.policy.batch_size, 1,
         False, 3, self.policy.discount)
     self._replay_iter = None
-
-    
 
   @property
   def replay_iter(self):
@@ -68,7 +76,6 @@ class Workspace:
       return self._replay_iter
       
   def create_environment(self, name, frame_stack=3, action_repeat=2, record=False, video_dir="./eval_vids"):
-    
     env = gym.make(name, render_mode='rgb_array')
     if action_repeat > 1:
       env = ActionRepeat(env, action_repeat)
@@ -199,12 +206,13 @@ class Workspace:
         time_step = {"pixels": pixels, "states": states, "action": action, "reward": reward, "discount": discount, "truncated": truncated}
         self.replay_storage.add(time_step)
 
-
     except KeyboardInterrupt:
       print("Caught keyboard interrupt. Saving before quitting.")
+      wandb.finish()
 
     finally:
       print(f"done?")  # pylint: disable=undefined-loop-variable
+      wandb.finish()
 
 
 def main():

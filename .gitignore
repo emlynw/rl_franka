@@ -3,3 +3,4 @@ tb/
 eval_vids/
 checkpoints/
 buffer/
+wandb/
