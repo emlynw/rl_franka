@@ -78,11 +78,6 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         qpos[6] += self.np_random.uniform(low=-1, high=1)
         print(len(qpos))
 
-        # create random x and y position for the target object, but make sure it is within a 1 meter circle -- this bit maybe useful later - not for now though
-        # while True:
-        #     self.goal = self.np_random.uniform(low=-0.25, high=0.25, size=2)
-        #     if np.linalg.norm(self.goal) < 1.0:
-        #         break
         self.goal_x = self.np_random.uniform(low=-0.25, high=0.25)
         self.goal_y = self.np_random.uniform(low=-0.4, high=0.4)
         qpos[9] = self.default_obj_pos[0] + self.goal_x
