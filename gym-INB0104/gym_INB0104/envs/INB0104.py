@@ -69,13 +69,15 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         self._step_count = 0
         # set up random initial state for the robot - but keep the fingers in place
         qpos = np.array([0, 0, 0, -1.57079, 0, 1.57079, -0.7853, 0.04, 0.04, 0.655, 0.515, 0.94, 0, 0, 0, 1])
-        qpos[0] += self.np_random.uniform(low=-1, high=1)
-        qpos[1] += self.np_random.uniform(low=-1, high=1)
-        qpos[2] += self.np_random.uniform(low=-1, high=1)
-        qpos[3] += self.np_random.uniform(low=-1, high=1)
-        qpos[4] += self.np_random.uniform(low=-1, high=1)
-        qpos[5] += self.np_random.uniform(low=-1, high=1)
-        qpos[6] += self.np_random.uniform(low=-1, high=1)
+        noise = np.random.uniform(low=-1, high=1, size=(7,))
+        qpos[0:7] += noise
+        # qpos[0] += self.np_random.uniform(low=-1, high=1)
+        # qpos[1] += self.np_random.uniform(low=-1, high=1)
+        # qpos[2] += self.np_random.uniform(low=-1, high=1)
+        # qpos[3] += self.np_random.uniform(low=-1, high=1)
+        # qpos[4] += self.np_random.uniform(low=-1, high=1)
+        # qpos[5] += self.np_random.uniform(low=-1, high=1)
+        # qpos[6] += self.np_random.uniform(low=-1, high=1)
         print(len(qpos))
 
         self.goal_x = self.np_random.uniform(low=-0.25, high=0.25)
@@ -85,8 +87,6 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         qvel = self.init_qvel + self.np_random.uniform(low=-0.005, high=0.005, size=self.model.nv)
         qvel[9:11] = 0
         self.set_state(qpos, qvel)
-        print(f"ee pos: {self.get_body_com('ee_center_body')}")
-        print(f"mocap pos: {self.get_body_com('panda_mocap')}")
         return self._get_obs()
 
     def _get_obs(self):
