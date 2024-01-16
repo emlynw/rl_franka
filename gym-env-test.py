@@ -4,11 +4,10 @@ import cv2
 
 import gym_INB0104
 import numpy as np
-np.set_printoptions(suppress=True)
 
 def main():
-    env = gym.make("gym_INB0104/INB0104-v0", render_mode="human")
-    # env = PixelObservationWrapper(env, pixels_only=False)
+    env = gym.make("gym_INB0104/INB0104-v0", render_mode="rgb_array")
+    env = PixelObservationWrapper(env, pixels_only=False)
     # env = FrameStack(env, num_frames=3)
     
     # # print the observation space
@@ -18,11 +17,13 @@ def main():
 
     # reset the environment
     obs, info = env.reset()
+    cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
+    cv2.waitKey(100)
     
     high = True
     # render the environment
     while True:
-        for i in range(1000):
+        for i in range(50):
             if i % 100 == 0:
                 high = not high
             if high:
@@ -30,6 +31,8 @@ def main():
             else:
                 action = env.action_space.low
             obs, reward, terminated, truncated, info = env.step(action)
+            cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
+            cv2.waitKey(10)
 
         env.reset()
 

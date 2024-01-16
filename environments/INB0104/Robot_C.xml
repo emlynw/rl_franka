@@ -15,52 +15,62 @@
 
   <asset>
     <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
-    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="300" height="300"/>
-    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
-    <texture name="ball_object_pushing" builtin="checker" mark="cross" width="151" height="151" rgb1="0.1 0.1 0.1" rgb2="0.9 0.9 0.9" markrgb="1 1 1"/>
-    <material name="ball_object_pushing" texture="ball_object_pushing" />
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="50" height="50"/>
+    <material name="groundplane" texture="groundplane" texuniform="true"  reflectance="0.2"/>
+    <texture name="plywood" file="plywood.png" type="2d"/>
+    <material name="plywood" texture="plywood" specular="1" shininess="1"/>
+    <texture name="brick_wall" file="brick_wall.png" type="2d"/>
+    <material name="brick_wall" texture="brick_wall" texuniform="true" specular="1" shininess="1"/>
   </asset>
 
-  <compiler angle="radian" meshdir="assets" autolimits="true"/>
+  <compiler angle="radian" meshdir="assets" texturedir = "textures" autolimits="true"/>
   
   <option integrator="implicitfast"/>
 
   <worldbody>
+    <!-- Fixed in the environment -->
     <light pos="0 0 1.5" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
-    <!-- <light pos="0 1.5 1.5" dir="0 0 -1" directional="true"/> -->
-    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
-
-    <!-- Robot - Franka Panda -->
-    <body pos='0.185 0.51 0.92' euler='0 0 0'>
-        <include file="panda_body.xml"/>
+    <geom name="floor" size="0 0 0.05" type="plane" rgba="0.74 0.73 0.67 1"/>
+    <body name="back_wall" pos="-1 0 2" euler="0 1.57 1.57">
+      <geom name="back_wall" type="plane" size="2 2 0.02" material="brick_wall"/> 
     </body>
-
-    <!-- INB0104 robot workspace -->
-    <body pos='0 0 0' euler='0 0 0'>
+    <body name="side_wall" pos="1 -2 2" euler="-1.57 0 3.1416">
+      <geom name="side_wall" type="plane" size="2 2 0.02" material="brick_wall"/> 
+    </body>
+    <body pos='-0.1575 -0.51 0' euler='0 0 0'>
         <include file="workbench.xml"/>
     </body>
-
-    <!-- target object -->
-    <!-- <body name="ball_object_pushing" pos="0.8 0.5 1.2">
-      <freejoint name="ball"/>
-      <geom name="ball_object_pushing" type="sphere" group="0" size="0.05" material="ball_object_pushing" priority="1" condim="6" friction=".7 .005 .005" solref="-10000 -30"/>
+    <!-- Camera -->
+    <camera name='side_camera' pos='1.8 0 1.7' euler='0 1.25 1.57' mode="fixed" fovy="57"/>  
+    <!-- <body pos='1.8 0 1.7' euler='0 1.25 1.57'>
+      <include file="d435i_body.xml"/>
     </body> -->
-    <body name="target_object" pos="0.655 0.515 0.9">
+
+    <!-- Can change in the environment -->
+    <body pos='0 0 0.92' euler='0 0 0'>
+        <include file="panda_body.xml"/>
+    </body>
+    <body mocap="true" name="panda_mocap" pos="0.1 0.01 1.4">
+            <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.7" size="0.005 0.005 0.005" type="box"></geom>
+            <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.1" size="0.5 0.005 0.005" type="box"></geom>
+            <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.1" size="0.005 0.5 0.001" type="box"></geom>
+            <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.1" size="0.005 0.005 0.5" type="box"></geom>
+    </body>
+
+    <body name="target_object" pos="0.5 0 1.2">
       <freejoint name="target"/>
       <geom name="target_object" type="box" size="0.04 0.02 0.02" rgba="0.95294117647 0.23921568627 0.23921568627 1.0"/> 
     </body>
 
-    <!-- Camera -->
-    <!-- <body pos='0.655 1.02 1.8' euler='2.35619 0 0'>
-      <include file="d435i_body.xml"/>
-    </body> -->
-    <camera name='side_camera' pos='1.8 0.5 1.7' euler='0 1.25 1.57' mode="fixed" fovy="57"/>  
-  
   </worldbody>
+
+  <equality>
+      <weld body1="panda_mocap" body2="ee_center_body" solimp="0.9 0.95 0.001" solref="0.02 1"/>
+  </equality>
 
   <keyframe>
     <!-- <key name="home" qpos="0 0 0 -1.57079 0 1.57079 -0.7853 0.04 0.04" ctrl="0 0 0 -1.57079 0 1.57079 -0.7853 255"/> -->
-    <key name="home" qpos="0 0 0 -1.57079 0 1.57079 -0.7853 0.04 0.04 0 0 0 0 0 0 0" ctrl="0 0 0 -1.57079 0 1.57079 -0.7853 255"/>
+    <key name="home" qpos="0.00 0.41 0.00 -1.85 0.00 2.26 0.79 0.00 0.00 0 0 0 0 0 0 0" ctrl="0 0 0 -1.57079 0 1.57079 -0.7853 255"/>
   </keyframe>
 
 </mujoco>

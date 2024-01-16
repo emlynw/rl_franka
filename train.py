@@ -76,7 +76,7 @@ class Workspace:
       return self._replay_iter
       
   def create_environment(self, name, frame_stack=3, action_repeat=2, record=False, video_dir="./eval_vids"):
-    env = gym.make(name, render_mode='rgb_array')
+    env = gym.make(name, render_mode='rgb_array', cartesian=False)
     if action_repeat > 1:
       env = ActionRepeat(env, action_repeat)
     if record:
