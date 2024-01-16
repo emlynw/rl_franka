@@ -4,9 +4,6 @@ import os
 from gymnasium import utils
 from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium.spaces import Box
-import mujoco
-from gym_INB0104.envs import mujoco_utils
-from typing import Optional, Any, SupportsFloat
 
 
 DEFAULT_CAMERA_CONFIG = {
@@ -33,23 +30,12 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         env_dir = os.path.join(cdir, "environments/INB0104/Robot_C.xml")
         MujocoEnv.__init__(self, env_dir, 5, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode
-        self._utils = mujoco_utils
-        self.n_substeps = 20
-        self.setup()
-
-    def setup(self):
+        # Leave these in in case useful later
+        self.max_position = np.array([2.8973, 1.7628, 2.8973, -0.0698, 2.8973, 3.7525, 2.8973, 1.0])
+        self.min_position = np.array([-2.8973, -1.7628, -2.8973, -3.0718, -2.8973, -0.0175, -2.8973, -1.0])
+        self.max_velocity = np.array([2.1750, 2.1750, 2.1750, 2.1750, 2.6100, 2.6100, 2.6100, 1.0])
+        self.max_torque = np.array([87, 87, 87, 87, 12, 12, 12, 12, 1.0])
         self.default_obj_pos = np.array([0.5, 0, 1.2])
-        self.neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.04, 0.04])
-        self.data.ctrl[0:7] = self.neutral_joint_values[0:7]
-        self.reset_mocap_welds(self.model, self.data)
-        mujoco.mj_forward(self.model, self.data)
-        self.init_qpos = self.neutral_joint_values
-        self.initial_qvel = np.copy(self.data.qvel)
-        self.initial_mocap_position = self._utils.get_site_xpos(self.model, self.data, "ee_center_site").copy()
-        self.grasp_site_pose = self.get_ee_orientation().copy()
-        self.set_mocap_pose(self.initial_mocap_position, self.grasp_site_pose)
-        self._mujoco_step()
-
 
     def step(self, a):
         target_pos = self.get_body_com("target_object")
@@ -99,30 +85,6 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         robot_pos = self.data.qpos[0:8].flat.copy()
         robot_vel = self.data.qvel[0:8].flat.copy()
         if self.use_distance:
-            return np.concatenate([robot_pos, robot_vel, self.get_body_com("ee_center_body") - self.get_body_com("target_object")])
+            return np.concatenate([robot_pos, robot_vel, self.get_body_com("left_finger") - self.get_body_com("target_object")])
         else:
             return np.concatenate([robot_pos, robot_vel])
-        
-    # Utils copied from https://github.com/zichunxx/panda_mujoco_gym/blob/master/panda_mujoco_gym/envs/panda_env.py
-        
-    def reset_mocap_welds(self, model, data) -> None:
-        if model.nmocap > 0 and model.eq_data is not None:
-            for i in range(model.eq_data.shape[0]):
-                if model.eq_type[i] == 1:
-                    # relative pose
-                    model.eq_data[i, 3:10] = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
-        mujoco.mj_forward(model, data)
-
-    def get_ee_orientation(self) -> np.ndarray:
-        site_mat = self._utils.get_site_xmat(self.model, self.data, "ee_center_site").reshape(9, 1)
-        current_quat = np.empty(4)
-        mujoco.mju_mat2Quat(current_quat, site_mat)
-        return current_quat
-    
-    def set_mocap_pose(self, position, orientation) -> None:
-        self._utils.set_mocap_pos(self.model, self.data, "panda_mocap", position)
-        self._utils.set_mocap_quat(self.model, self.data, "panda_mocap", orientation)
-
-    def _mujoco_step(self, action: Optional[np.ndarray] = None) -> None:
-        for _ in range(10):
-            mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
