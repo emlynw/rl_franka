@@ -1,9 +1,6 @@
-### Set up :
+### Installation:
 
-We will use gymnasium for our RL based learning and mujoco as the physics simulator/environment.
-
-pip3 install mujoco
-pip3 install gymnasium
+Requires:mujoco, gymnasium
 
 git clone https://github.com/WillMandil001/RL_Franka_Pushing.git
 
@@ -21,9 +18,6 @@ python3 gym-env-test.py
 - The INB0104 .xml head script is found in /environments/INB0104/Robot_C.xml
 
 # ToDo:
-- we need to set up the reward to be correct.
-- we need to set up the DeepRL velocity controller. (camera RGB image as input)
-- Train the DeepRL policy
 - implement DeepRL network on the real robot and setup real world velocity controller
 - add safety control to the real world controller
 - test the system and asses sim-2-real gap for the camera and the robot.

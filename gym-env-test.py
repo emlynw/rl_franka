@@ -24,12 +24,7 @@ def main():
     # render the environment
     while True:
         for i in range(50):
-            if i % 100 == 0:
-                high = not high
-            if high:
-                action = env.action_space.high
-            else:
-                action = env.action_space.low
+            action = np.array([0, 0.2, 0, 0])
             obs, reward, terminated, truncated, info = env.step(action)
             cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
             cv2.waitKey(10)

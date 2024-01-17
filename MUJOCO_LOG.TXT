@@ -1,3 +1,0 @@
-Mon Jan 15 17:21:44 2024
-WARNING: mju_openResource: unknown file 'environments/Robot_C.xml'
-
