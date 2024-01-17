@@ -91,7 +91,7 @@
                       <geom mesh="hand_c" class="collision"/>
                       <!-- Added from https://github.com/zichunxx/panda_mujoco_gym/blob/master/panda_mujoco_gym/assets/panda_mocap.xml -->
                       <body name="ee_center_body" pos="0 0 0.105">
-                            <site name='ee_center_site' rgba = "1 0 0 1" size="0.01" group="1"/>
+                            <site name='ee_center_site' rgba = "1 0 0 1" size="0.01" group="3"/>
                       </body>
                       <body name="left_finger" pos="0 0 0.0584" gravcomp="1">
                         <inertial mass="0.015" pos="0 0 0" diaginertia="2.375e-6 2.375e-6 7.5e-7"/>

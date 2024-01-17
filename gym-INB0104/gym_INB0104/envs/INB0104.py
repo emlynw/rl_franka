@@ -31,10 +31,10 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         observation_space = Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64)
         cdir = os.getcwd()
         env_dir = os.path.join(cdir, "environments/INB0104/Robot_C.xml")
-        MujocoEnv.__init__(self, env_dir, 5, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
+        self.frame_skip = 5
+        MujocoEnv.__init__(self, env_dir, self.frame_skip, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode
         self._utils = mujoco_utils
-        self.n_substeps = 20
         self.action_scale = 0.05
         self.neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.04, 0.04])
         self.default_obj_pos = np.array([0.5, 0, 1.1])
@@ -43,6 +43,8 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
             np.array([+1, +1, +1, +1]),
             dtype=np.float64,
         )
+        self.ee_low = np.array([0.2, -0.45, 0.93])
+        self.ee_high = np.array([0.7, 0.45, 1.2])
         self.ep_steps = 0
         self.setup()
 
@@ -68,7 +70,10 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         if self.model.na != 0:
             self.data.act[:] = None
         self.set_joint_neutral()
-        ee_noise = self.np_random.uniform(low=-0.1, high=0.1, size=3)
+        ee_noise_x = self.np_random.uniform(low=-0.1, high=0.00)
+        ee_noise_y = self.np_random.uniform(low=-0.2, high=0.2)
+        ee_noise_z = self.np_random.uniform(low=-0.05, high=0.05)
+        ee_noise = np.array([ee_noise_x, ee_noise_y, ee_noise_z])
         self.set_mocap_pose(self.initial_mocap_position+ee_noise, self.grasp_site_pose)
 
         self.goal_x_noise = self.np_random.uniform(low=-0.25, high=0.25)
@@ -76,6 +81,8 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         self.data.qpos[9] = self.default_obj_pos[0] + self.goal_x_noise
         self.data.qpos[10] = self.default_obj_pos[1] + self.goal_y_noise
         mujoco.mj_forward(self.model, self.data)
+        for _ in range(100):
+            mujoco.mj_step(self.model, self.data)
         
         return self._get_obs()
 
@@ -114,7 +121,9 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         self.data.ctrl[-1] = gripper_ctrl
         # Change ee position
         pos_ctrl *= self.action_scale
-        pos_ctrl += self.get_body_com("ee_center_body").copy()
+        pos_ctrl += self.get_ee_position().copy()
+        pos_ctrl = np.clip(pos_ctrl, self.ee_low, self.ee_high)
+        print(f"pos_ctrl: {pos_ctrl}")
         self.set_mocap_pose(pos_ctrl, self.grasp_site_pose)
 
     def _get_obs(self):
@@ -140,6 +149,9 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         # assign value to arm joints
         self.data.qpos[0:9] = self.neutral_joint_values
 
+    def get_ee_position(self) -> np.ndarray:
+        return self._utils.get_site_xpos(self.model, self.data, "ee_center_site")
+
     def get_ee_orientation(self) -> np.ndarray:
         site_mat = self._utils.get_site_xmat(self.model, self.data, "ee_center_site").reshape(9, 1)
         current_quat = np.empty(4)
@@ -151,7 +163,7 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         self._utils.set_mocap_quat(self.model, self.data, "panda_mocap", orientation)
 
     def _mujoco_step(self, action: Optional[np.ndarray] = None) -> None:
-        mujoco.mj_step(self.model, self.data, nstep=self.n_substeps)
+        mujoco.mj_step(self.model, self.data, nstep=self.frame_skip)
 
     def get_fingers_width(self) -> np.ndarray:
         finger1 = self._utils.get_joint_qpos(self.model, self.data, "finger_joint1")
