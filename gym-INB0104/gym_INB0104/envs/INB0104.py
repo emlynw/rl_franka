@@ -43,8 +43,8 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
             np.array([+1, +1, +1, +1]),
             dtype=np.float64,
         )
-        self.ee_low = np.array([0.2, -0.45, 0.93])
-        self.ee_high = np.array([0.7, 0.45, 1.2])
+        self.ee_low = np.array([0.2, -0.4, 0.93])
+        self.ee_high = np.array([0.7, 0.4, 1.2])
         self.ep_steps = 0
         self.setup()
 
@@ -64,20 +64,53 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         self.initial_time = self.data.time
         self.initial_qvel = np.copy(self.data.qvel)
 
+        self.cam_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "cam0")
+        self.init_cam_pos = self.model.body_pos[self.cam_body_id].copy()
+        self.init_cam_quat = self.model.body_quat[self.cam_body_id].copy()
+
+        self.light_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "light0")
+        self.init_light_pos = self.model.body_pos[self.light_body_id].copy()
+
+        self.plywood_mat_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_MATERIAL, "plywood")
+        self.init_plywood_rgba = self.model.mat_rgba[self.plywood_mat_id].copy()
+
+        self.brick_mat_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_MATERIAL, "brick_wall")
+        self.init_brick_rgba = self.model.mat_rgba[self.brick_mat_id].copy()
+        
+
     def reset_model(self):
+        # Add noise to camera position and orientation
+        cam_pos_noise = np.random.uniform(low=[-0.1,-0.2,-0.1], high=[0.1,0.2,0.1], size=3)
+        cam_quat_noise = np.random.uniform(low=-0.01, high=0.01, size=4)
+        self.model.body_pos[self.cam_body_id] = self.init_cam_pos + cam_pos_noise
+        self.model.body_quat[self.cam_body_id] = self.init_cam_quat + cam_quat_noise
+        # Add noise to light position
+        light_pos_noise = np.random.uniform(low=[-0.8,-0.5,-0.2], high=[1.2,0.5,0.2], size=3)
+        self.model.body_pos[self.light_body_id] = self.init_light_pos + light_pos_noise
+        # Randomize table color
+        channel = np.random.randint(0,3)
+        table_color_noise = np.random.uniform(low=-0.05, high=0.2, size=1)
+        self.model.mat_rgba[self.plywood_mat_id] = self.init_plywood_rgba
+        self.model.mat_rgba[self.plywood_mat_id][channel] = self.init_plywood_rgba[channel] + table_color_noise
+        # Randomize brick color
+        channel = np.random.randint(0,3)
+        brick_color_noise = np.random.uniform(low=-0.1, high=0.1, size=1)
+        self.model.mat_rgba[self.brick_mat_id] = self.init_brick_rgba
+        self.model.mat_rgba[self.brick_mat_id][channel] = self.init_brick_rgba[channel] + brick_color_noise
+    
         self.data.time = self.initial_time
         self.data.qvel[:] = np.copy(self.initial_qvel)
         if self.model.na != 0:
             self.data.act[:] = None
         self.set_joint_neutral()
-        ee_noise_x = self.np_random.uniform(low=-0.1, high=0.00)
-        ee_noise_y = self.np_random.uniform(low=-0.2, high=0.2)
-        ee_noise_z = self.np_random.uniform(low=-0.05, high=0.05)
+        ee_noise_x = np.random.uniform(low=-0.1, high=0.00)
+        ee_noise_y = np.random.uniform(low=-0.2, high=0.2)
+        ee_noise_z = np.random.uniform(low=-0.05, high=0.05)
         ee_noise = np.array([ee_noise_x, ee_noise_y, ee_noise_z])
         self.set_mocap_pose(self.initial_mocap_position+ee_noise, self.grasp_site_pose)
 
-        self.goal_x_noise = self.np_random.uniform(low=-0.25, high=0.25)
-        self.goal_y_noise = self.np_random.uniform(low=-0.4, high=0.4)
+        self.goal_x_noise = np.random.uniform(low=-0.25, high=0.25)
+        self.goal_y_noise = np.random.uniform(low=-0.4, high=0.4)
         self.data.qpos[9] = self.default_obj_pos[0] + self.goal_x_noise
         self.data.qpos[10] = self.default_obj_pos[1] + self.goal_y_noise
         mujoco.mj_forward(self.model, self.data)
@@ -123,7 +156,6 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         pos_ctrl *= self.action_scale
         pos_ctrl += self.get_ee_position().copy()
         pos_ctrl = np.clip(pos_ctrl, self.ee_low, self.ee_high)
-        print(f"pos_ctrl: {pos_ctrl}")
         self.set_mocap_pose(pos_ctrl, self.grasp_site_pose)
 
     def _get_obs(self):

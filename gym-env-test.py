@@ -21,11 +21,10 @@ def main():
         truncated = False
         while not terminated and not truncated:
             # action = np.zeros(len(env.action_space.sample()))
-            action = np.array([0, 0, -0.5, 1])
+            action = np.array([0.2, 0.4, 0, 1])
             obs, reward, terminated, truncated, info = env.step(action)
             cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
             cv2.waitKey(10)
-        print(F"done: {terminated}, truncated: {truncated}")
         obs, info = env.reset()
         cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
         cv2.waitKey(10)

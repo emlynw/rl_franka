@@ -7,14 +7,14 @@
   <include file="d435i_assets.xml"/>
 
   <visual>
-    <!-- <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/> -->
     <rgba haze="0.15 0.25 0.35 1"/>
     <quality shadowsize="8192"/>
     <global azimuth="120" elevation="-20"/>
+     <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
   </visual>
 
   <asset>
-    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <!-- <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/> -->
     <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="50" height="50"/>
     <material name="groundplane" texture="groundplane" texuniform="true"  reflectance="0.2"/>
     <texture name="plywood" file="plywood.png" type="2d"/>
@@ -31,27 +31,35 @@
 
   <worldbody>
     <!-- Fixed in the environment -->
-    <light pos="0 0 1.5" dir="0 0 -1" directional="true" diffuse="0.5 0.5 0.5"/>
+    <body name="light0" pos="0 0 2.5">
+      <site name="light0" pos="0 0 0.1" size="0.1 0.1 0.1" type="sphere" rgba="1 1 1 1"/>
+      <light pos="0 0 0" dir="0 0 -1" directional="false" diffuse="0.3 0.3 0.3" ambient="0 0 0"/>
+    </body>
+
     <geom name="floor" size="0 0 0.05" type="plane" rgba="0.74 0.73 0.67 1"/>
+
     <body name="back_wall" pos="-1 0 2" euler="0 1.57 1.57">
       <geom name="back_wall" type="plane" size="2 2 0.02" material="brick_wall"/> 
     </body>
+
     <body name="side_wall" pos="1 -2 2" euler="-1.57 0 3.1416">
       <geom name="side_wall" type="plane" size="2 2 0.02" material="brick_wall"/> 
     </body>
+
     <body pos='-0.1575 -0.51 0' euler='0 0 0'>
         <include file="workbench.xml"/>
     </body>
-    <!-- Camera -->
-    <camera name='side_camera' pos='1.8 0 1.7' euler='0 1.25 1.57' mode="fixed" fovy="57"/>  
-    <!-- <body pos='1.8 0 1.7' euler='0 1.25 1.57'>
-      <include file="d435i_body.xml"/>
-    </body> -->
+
+    <!-- Camera --> 
+    <body name = "cam0" pos='1.7 0 1.7' euler='0 1.25 1.57'>
+      <camera name='side_camera' mode="fixed" fovy="57"/> 
+    </body>
 
     <!-- Can change in the environment -->
     <body pos='0 0 0.92' euler='0 0 0'>
         <include file="panda_body.xml"/>
     </body>
+    
     <body mocap="true" name="panda_mocap" pos="0.1 0.01 1.4">
             <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.7" size="0.005 0.005 0.005" type="box" group="3"></geom>
             <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.1" size="0.2 0.005 0.005" type="box" group="3"></geom>
