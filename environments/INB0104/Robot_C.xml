@@ -17,6 +17,7 @@
     <!-- <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/> -->
     <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8" width="50" height="50"/>
     <material name="groundplane" texture="groundplane" texuniform="true"  reflectance="0.2"/>
+    <texture name="table" file="table.png" type="2d"/>
     <texture name="plywood" file="plywood.png" type="2d"/>
     <material name="plywood" texture="plywood" specular="1" shininess="1"/>
     <texture name="brick_wall" file="brick_wall.png" type="2d"/>
@@ -32,7 +33,7 @@
   <worldbody>
     <!-- Fixed in the environment -->
     <body name="light0" pos="0 0 2.5">
-      <site name="light0" pos="0 0 0.1" size="0.1 0.1 0.1" type="sphere" rgba="1 1 1 1"/>
+      <!-- <site name="light0" pos="0 0 0.1" size="0.1 0.1 0.1" type="sphere" rgba="1 1 1 1"/> -->
       <light pos="0 0 0" dir="0 0 -1" directional="false" diffuse="0.3 0.3 0.3" ambient="0 0 0"/>
     </body>
 
@@ -46,12 +47,24 @@
       <geom name="side_wall" type="plane" size="2 2 0.02" material="brick_wall"/> 
     </body>
 
+    <body name="back_curtain" pos="-0.4 0 1.65" euler="0 1.57 3.1416">
+      <geom name="back_curtain" type="plane" size="0.7 0.6 0.02" rgba="0.2 0.2 0.2 1"/> 
+    </body>
+
+    <body name="left_curtain" pos="0.2 -0.6 1.65" euler="-1.57 0 3.1416">
+      <geom name="left_curtain" type="plane" size="0.6 0.7 0.02" rgba="0.2 0.2 0.2 1"/> 
+    </body>
+
+    <body name="right_curtain" pos="0.2 0.6 1.65" euler="1.57 0 3.1416">
+      <geom name="right_curtain" type="plane" size="0.6 0.7 0.02" rgba="0.2 0.2 0.2 1"/> 
+    </body>
+
     <body pos='-0.1575 -0.51 0' euler='0 0 0'>
         <include file="workbench.xml"/>
     </body>
 
     <!-- Camera --> 
-    <body name = "cam0" pos='1.7 0 1.7' euler='0 1.25 1.57'>
+    <body name = "cam0" pos='1.15 0 1.25' euler='0 1.25 1.57'>
       <camera name='side_camera' mode="fixed" fovy="57"/> 
     </body>
 

@@ -7,7 +7,7 @@ import numpy as np
 
 def main():
     env = gym.make("gym_INB0104/INB0104-v0", render_mode="rgb_array")
-    env = TimeLimit(env, max_episode_steps=100)
+    env = TimeLimit(env, max_episode_steps=200)
     env = PixelObservationWrapper(env, pixels_only=False)
     
 
@@ -15,16 +15,22 @@ def main():
     obs, info = env.reset()
     cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
     cv2.waitKey(10)
+    i=0
 
     while True:
         terminated = False
         truncated = False
+        i=0
         while not terminated and not truncated:
             # action = np.zeros(len(env.action_space.sample()))
-            action = np.array([0.2, 0.4, 0, 1])
+            if i < 100:
+                action = np.array([0.4, 0.4, -0.1, 1])
+            else:
+                action = np.array([-0.4, -0.4, -0.1, 1])
             obs, reward, terminated, truncated, info = env.step(action)
             cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
             cv2.waitKey(10)
+            i+=1
         obs, info = env.reset()
         cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
         cv2.waitKey(10)

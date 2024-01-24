@@ -43,8 +43,8 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
             np.array([+1, +1, +1, +1]),
             dtype=np.float64,
         )
-        self.ee_low = np.array([0.2, -0.4, 0.93])
-        self.ee_high = np.array([0.7, 0.4, 1.2])
+        self.ee_low = np.array([0.15, -0.3, 0.93])
+        self.ee_high = np.array([0.65, 0.3, 1.2])
         self.ep_steps = 0
         self.setup()
 
@@ -71,16 +71,24 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         self.light_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "light0")
         self.init_light_pos = self.model.body_pos[self.light_body_id].copy()
 
+        self.plywood_tex_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_TEXTURE, "plywood")
+        self.table_tex_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_TEXTURE, "table")
         self.plywood_mat_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_MATERIAL, "plywood")
         self.init_plywood_rgba = self.model.mat_rgba[self.plywood_mat_id].copy()
 
         self.brick_mat_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_MATERIAL, "brick_wall")
         self.init_brick_rgba = self.model.mat_rgba[self.brick_mat_id].copy()
-        
+
+        self.left_curtain_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "left_curtain")
+        self.init_left_curtain_rgba = self.model.geom_rgba[self.left_curtain_geom_id].copy()
+        self.right_curtain_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "right_curtain")
+        self.init_right_curtain_rgba = self.model.geom_rgba[self.right_curtain_geom_id].copy()
+        self.back_curtain_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "back_curtain")
+        self.init_back_curtain_rgba = self.model.geom_rgba[self.back_curtain_geom_id].copy()
 
     def reset_model(self):
         # Add noise to camera position and orientation
-        cam_pos_noise = np.random.uniform(low=[-0.1,-0.2,-0.1], high=[0.1,0.2,0.1], size=3)
+        cam_pos_noise = np.random.uniform(low=[-0.05,-0.05,-0.02], high=[0.05,0.05,0.02], size=3)
         cam_quat_noise = np.random.uniform(low=-0.01, high=0.01, size=4)
         self.model.body_pos[self.cam_body_id] = self.init_cam_pos + cam_pos_noise
         self.model.body_quat[self.cam_body_id] = self.init_cam_quat + cam_quat_noise
@@ -90,6 +98,7 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         # Randomize table color
         channel = np.random.randint(0,3)
         table_color_noise = np.random.uniform(low=-0.05, high=0.2, size=1)
+        self.model.mat_texid[self.plywood_mat_id] = np.random.choice([self.plywood_tex_id, self.table_tex_id])
         self.model.mat_rgba[self.plywood_mat_id] = self.init_plywood_rgba
         self.model.mat_rgba[self.plywood_mat_id][channel] = self.init_plywood_rgba[channel] + table_color_noise
         # Randomize brick color
@@ -97,6 +106,12 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         brick_color_noise = np.random.uniform(low=-0.1, high=0.1, size=1)
         self.model.mat_rgba[self.brick_mat_id] = self.init_brick_rgba
         self.model.mat_rgba[self.brick_mat_id][channel] = self.init_brick_rgba[channel] + brick_color_noise
+        # Randomize curtain alpha
+        alpha = np.random.choice([0.0, 1.0])
+        self.model.geom_rgba[self.left_curtain_geom_id][3] = alpha
+        self.model.geom_rgba[self.right_curtain_geom_id][3] = alpha
+        self.model.geom_rgba[self.back_curtain_geom_id][3] = alpha
+
     
         self.data.time = self.initial_time
         self.data.qvel[:] = np.copy(self.initial_qvel)
