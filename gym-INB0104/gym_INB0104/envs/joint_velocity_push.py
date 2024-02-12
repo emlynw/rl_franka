@@ -84,10 +84,10 @@ class joint_velocity_push(MujocoEnv, utils.EzPickle):
 
     def reset_model(self):
         # Add noise to camera position and orientation
-        # cam_pos_noise = np.random.uniform(low=[-0.05,-0.05,-0.02], high=[0.05,0.05,0.02], size=3)
-        # cam_quat_noise = np.random.uniform(low=-0.01, high=0.01, size=4)
-        # self.model.body_pos[self.cam_body_id] = self.init_cam_pos + cam_pos_noise
-        # self.model.body_quat[self.cam_body_id] = self.init_cam_quat + cam_quat_noise
+        cam_pos_noise = np.random.uniform(low=[-0.05,-0.05,-0.02], high=[0.05,0.05,0.02], size=3)
+        cam_quat_noise = np.random.uniform(low=-0.01, high=0.01, size=4)
+        self.model.body_pos[self.cam_body_id] = self.init_cam_pos + cam_pos_noise
+        self.model.body_quat[self.cam_body_id] = self.init_cam_quat + cam_quat_noise
         # Add noise to light position
         light_pos_noise = np.random.uniform(low=[-0.8,-0.5,-0.2], high=[1.2,0.5,0.2], size=3)
         self.model.body_pos[self.light_body_id] = self.init_light_pos + light_pos_noise
