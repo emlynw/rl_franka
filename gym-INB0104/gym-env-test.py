@@ -8,12 +8,13 @@ import numpy as np
 def main():
     env = gym.make("gym_INB0104/INB0104-v0", render_mode="rgb_array")
     env = TimeLimit(env, max_episode_steps=200)
-    env = PixelObservationWrapper(env, pixels_only=False)
+    # env = PixelObservationWrapper(env, pixels_only=False)
     
 
     # reset the environment
     obs, info = env.reset()
-    cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
+    pixels = env.render()
+    cv2.imshow("pixels", cv2.cvtColor(pixels, cv2.COLOR_RGB2BGR))
     cv2.waitKey(10)
     i=0
 
@@ -24,15 +25,19 @@ def main():
         while not terminated and not truncated:
             # action = np.zeros(len(env.action_space.sample()))
             if i < 100:
-                action = np.array([0.4, 0.4, -0.1, 1])
+                action = np.array([0.1, 0, 0, 0.02])
             else:
-                action = np.array([-0.4, -0.4, -0.1, 1])
+                action = np.array([-0.1, 0, 0, 0.02])
             obs, reward, terminated, truncated, info = env.step(action)
-            cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
+            pixels = env.render()
+            for k, v in info.items():
+                print(f"{k}: {v}")
+            cv2.imshow("pixels", cv2.cvtColor(pixels, cv2.COLOR_RGB2BGR))
             cv2.waitKey(10)
             i+=1
         obs, info = env.reset()
-        cv2.imshow("obs", cv2.cvtColor(obs['pixels'], cv2.COLOR_RGB2BGR))
+        pixels = env.render()
+        cv2.imshow("pixels", cv2.cvtColor(pixels, cv2.COLOR_RGB2BGR))
         cv2.waitKey(10)
 
 

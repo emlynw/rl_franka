@@ -22,29 +22,26 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
             "rgb_array", 
             "depth_array"
         ], 
-        "render_fps": 100
+        "render_fps": 10
     }
     
     def __init__(self, render_mode=None, use_distance=False, **kwargs):
         utils.EzPickle.__init__(self, use_distance, **kwargs)
         self.use_distance = use_distance
         observation_space = Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64)
-        cdir = os.getcwd()
-        env_dir = os.path.join(cdir, "environments/INB0104/Robot_C.xml")
-        self.frame_skip = 5
+        env_dir = "/home/emlyn/rl_franka/environments/INB0104/Robot_C.xml"
+        self.frame_skip = 50
         MujocoEnv.__init__(self, env_dir, self.frame_skip, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode
         self._utils = mujoco_utils
-        self.action_scale = 0.05
         self.neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.04, 0.04])
-        self.default_obj_pos = np.array([0.5, 0, 1.1])
         self.action_space = Box(
-            np.array([-1, -1, -1, -1]),
-            np.array([+1, +1, +1, +1]),
+            np.array([-0.2, -0.2, -0.2, 0.0]),
+            np.array([0.2, 0.2, 0.2, 0.04]),
             dtype=np.float64,
         )
-        self.ee_low = np.array([0.15, -0.3, 0.93])
-        self.ee_high = np.array([0.65, 0.3, 1.2])
+        self.ee_low = np.array([0.2, -0.2, 0.93])
+        self.ee_high = np.array([0.75, 0.2, 1.0])
         self.ep_steps = 0
         self.setup()
 
@@ -86,6 +83,15 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         self.back_curtain_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "back_curtain")
         self.init_back_curtain_rgba = self.model.geom_rgba[self.back_curtain_geom_id].copy()
 
+        self.object_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "target_object")
+        self.default_obj_pos = np.array([0.5, 0, 1.1])
+        self.default_obs_quat = np.array([1, 0, 0, 0])
+
+        self.target_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "target_site")
+        self.init_target_site_pos = self._utils.get_site_xpos(self.model, self.data, "target_site").copy()
+
+        
+
     def reset_model(self):
         # Add noise to camera position and orientation
         cam_pos_noise = np.random.uniform(low=[-0.05,-0.05,-0.02], high=[0.05,0.05,0.02], size=3)
@@ -107,27 +113,34 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         self.model.mat_rgba[self.brick_mat_id] = self.init_brick_rgba
         self.model.mat_rgba[self.brick_mat_id][channel] = self.init_brick_rgba[channel] + brick_color_noise
         # Randomize curtain alpha
-        alpha = np.random.choice([0.0, 1.0])
+        alpha = np.random.choice([0.0, 1.0, np.random.uniform(low=0.1, high=0.9)])
         self.model.geom_rgba[self.left_curtain_geom_id][3] = alpha
         self.model.geom_rgba[self.right_curtain_geom_id][3] = alpha
         self.model.geom_rgba[self.back_curtain_geom_id][3] = alpha
+        # Move target site
+        self.goal_x_noise = np.random.uniform(low=0.00, high=0.08)
+        self.goal_y_noise = np.random.uniform(low=-0.05, high=0.05)
+        self.model.site_pos[self.target_site_id] = self.init_target_site_pos + [self.goal_x_noise, self.goal_y_noise, 0]
 
-    
+        # Move object
+        self.object_x_noise = np.random.uniform(low=-0.15, high=0.1)
+        self.object_y_noise = np.random.uniform(low=-0.1, high=0.1)
+        self.object_theta_noise = np.random.uniform(low=-0.5, high=0.5)
+        self.data.qpos[9] = self.default_obj_pos[0] + self.object_x_noise
+        self.data.qpos[10] = self.default_obj_pos[1] + self.object_y_noise
+        self.data.qpos[12] = self.default_obs_quat[0] + self.object_theta_noise
+        
         self.data.time = self.initial_time
         self.data.qvel[:] = np.copy(self.initial_qvel)
         if self.model.na != 0:
             self.data.act[:] = None
         self.set_joint_neutral()
-        ee_noise_x = np.random.uniform(low=-0.1, high=0.00)
+        ee_noise_x = np.random.uniform(low=0.0, high=0.10)
         ee_noise_y = np.random.uniform(low=-0.2, high=0.2)
-        ee_noise_z = np.random.uniform(low=-0.05, high=0.05)
-        ee_noise = np.array([ee_noise_x, ee_noise_y, ee_noise_z])
+        ee_noise = np.array([ee_noise_x, ee_noise_y, 0])
+        self.initial_mocap_position = [0.25, 0.0, 0.93]
         self.set_mocap_pose(self.initial_mocap_position+ee_noise, self.grasp_site_pose)
 
-        self.goal_x_noise = np.random.uniform(low=-0.25, high=0.25)
-        self.goal_y_noise = np.random.uniform(low=-0.4, high=0.4)
-        self.data.qpos[9] = self.default_obj_pos[0] + self.goal_x_noise
-        self.data.qpos[10] = self.default_obj_pos[1] + self.goal_y_noise
         mujoco.mj_forward(self.model, self.data)
         for _ in range(100):
             mujoco.mj_step(self.model, self.data)
@@ -146,32 +159,36 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         if self.render_mode == "human":
             self.render()
         # Reward
-        target_pos = self.get_body_com("target_object").copy()
-        vec = self.get_body_com("ee_center_body").copy() - target_pos
-        r_dist = -np.linalg.norm(vec)
+        ee_pos = self.get_body_com("ee_center_body").copy()
+        target_obj = self.get_body_com("target_object").copy()
+        ee_to_obj = ee_pos - target_obj
+        r_dist_1 = -np.linalg.norm(ee_to_obj)
+        target_site = self._utils.get_site_xpos(self.model, self.data, "target_site").copy()
+        r_dist_2 = -np.linalg.norm(target_obj - target_site)
+
         r_ctrl = -np.square(action).sum()
-        num_colls = self.data.ncon
-        r_colls = -max(0,num_colls-4)
-        quat = self.data.xquat[10]
-        quat = np.array([quat[0], quat[1], quat[2], quat[3]])
-        upright_orientation = np.array([1, 0, 1, 0])
-        r_ori = -np.linalg.norm(quat - upright_orientation)
-        reward = r_dist + 0.2*r_colls
-        info = dict(reward_dist=r_dist, reward_ori=r_ori)
+        # num_colls = self.data.ncon
+        # r_colls = -max(0,num_colls-4)
+        # quat = self.data.xquat[10]
+        # quat = np.array([quat[0], quat[1], quat[2], quat[3]])
+        # upright_orientation = np.array([1, 0, 1, 0])
+        # r_ori = -np.linalg.norm(quat - upright_orientation)
+        reward = r_dist_1 + r_dist_2 + 4*r_ctrl
+        info = dict(ee_to_obj=r_dist_1, obj_to_target=r_dist_2,  reward_ctrl=r_ctrl) 
 
         return obs, reward, False, False, info 
     
     def _set_action(self, action):
         action = action.copy()
-        pos_ctrl = action[:3]
+        vel = action[:3]
+        dt = 0.1
         gripper_ctrl = action[3]
         # Control gripper
         self.data.ctrl[-1] = gripper_ctrl
         # Change ee position
-        pos_ctrl *= self.action_scale
-        pos_ctrl += self.get_ee_position().copy()
-        pos_ctrl = np.clip(pos_ctrl, self.ee_low, self.ee_high)
-        self.set_mocap_pose(pos_ctrl, self.grasp_site_pose)
+        new_pos = self.get_ee_position() + vel*dt
+        new_pos = np.clip(new_pos, self.ee_low, self.ee_high)
+        self.set_mocap_pose(new_pos, self.grasp_site_pose)
 
     def _get_obs(self):
         ee_pos = self.get_body_com("ee_center_body")
