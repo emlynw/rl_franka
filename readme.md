@@ -10,12 +10,11 @@ cd rl_franka/gym-INB0104
 pip3 install -e .
 
 ### Running the current simulation:
-python3 gym-env-test.py
+python /rl_franka/gym-INB0104/test/cartesian_velocity_test.py
+python /rl_franka/gym-INB0104/test/joint_velocity_test.py
 
 ### editing and adding to the simulation:
-- The Gymnasium RL training script is found at /src/gym-env-test.py
-- The gymnasium simulation environment is found in /gym-INB0104/envs/INB0104
-- The INB0104 .xml head script is found in /environments/INB0104/Robot_C.xml
-
+- The gymnasium simulation environments are found in /rl_franka/gym-INB0104/gym_INB0104/envs
+- The mujoco xml files are in /rl_franka/gym-INB0104/gym_INB0104/environments/INB0104
 
 
