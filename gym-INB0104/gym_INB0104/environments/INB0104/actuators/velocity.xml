@@ -18,8 +18,7 @@
     <velocity class="panda" name="actuator5" joint="joint5"  kv="50" forcerange="-12 12" ctrlrange="-2.6100 2.6100"/>
     <velocity class="panda" name="actuator6" joint="joint6"  kv="50" forcerange="-12 12" ctrlrange="-2.6100 2.6100"/>
     <velocity class="panda" name="actuator7" joint="joint7"  kv="50" forcerange="-12 12" ctrlrange="-2.6100 2.6100"/>
-    <general class="panda" class="panda" name="actuator8" tendon="split" forcerange="-100 100" ctrlrange="0 255"
-      gainprm="0.01568627451 0 0" biasprm="0 -100 -10"/>
+    <general class="panda" name="actuator8" tendon="split" forcerange="-100 100" ctrlrange="0 255" gainprm="0.01568627451 0 0" biasprm="0 -100 -10"/>
   </actuator>
 
 </mujocoinclude>

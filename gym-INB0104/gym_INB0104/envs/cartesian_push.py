@@ -16,7 +16,7 @@ DEFAULT_CAMERA_CONFIG = {
     }
 
 
-class INB0104Env(MujocoEnv, utils.EzPickle):
+class cartesian_push(MujocoEnv, utils.EzPickle):
     metadata = { 
         "render_modes": [ 
             "human",
@@ -30,8 +30,8 @@ class INB0104Env(MujocoEnv, utils.EzPickle):
         utils.EzPickle.__init__(self, use_distance, **kwargs)
         self.use_distance = use_distance
         observation_space = Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64)
-        p = Path(__file__).parents[2]
-        env_dir = os.path.join(p, "environments/INB0104/Robot_C.xml")
+        p = Path(__file__).parents[1]
+        env_dir = os.path.join(p, "environments/INB0104/cartesian_push.xml")
         self.frame_skip = 50
         MujocoEnv.__init__(self, env_dir, self.frame_skip, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode

@@ -6,7 +6,7 @@ import gym_INB0104
 import numpy as np
 
 def main():
-    env = gym.make("gym_INB0104/INB0104-v0", render_mode="rgb_array")
+    env = gym.make("gym_INB0104/joint_velocity_push", render_mode="rgb_array")
     env = TimeLimit(env, max_episode_steps=200)
     # env = PixelObservationWrapper(env, pixels_only=False)
     
@@ -25,9 +25,9 @@ def main():
         while not terminated and not truncated:
             # action = np.zeros(len(env.action_space.sample()))
             if i < 100:
-                action = np.array([0.1, 0, 0, 0])
+                action = np.array([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.0])
             else:
-                action = np.array([-0.1, 0, 0, 0.04])
+                action = np.array([-0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, 255])
             obs, reward, terminated, truncated, info = env.step(action)
             pixels = env.render()
             for k, v in info.items():

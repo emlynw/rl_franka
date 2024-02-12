@@ -5,8 +5,9 @@ gym_INB0104.egg-info/SOURCES.txt
 gym_INB0104.egg-info/dependency_links.txt
 gym_INB0104.egg-info/requires.txt
 gym_INB0104.egg-info/top_level.txt
-gym_INB0104/envs/INB0104.py
 gym_INB0104/envs/__init__.py
+gym_INB0104/envs/cartesian_push.py
+gym_INB0104/envs/joint_velocity_push.py
 gym_INB0104/envs/mujoco_utils.py
 gym_INB0104/envs/non_cartesian.py
 gym_INB0104/wrappers/__init__.py
