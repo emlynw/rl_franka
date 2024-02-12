@@ -25,9 +25,9 @@ def main():
         while not terminated and not truncated:
             # action = np.zeros(len(env.action_space.sample()))
             if i < 100:
-                action = np.array([0.1, 0, 0, 0.02])
+                action = np.array([0.1, 0, 0, 0])
             else:
-                action = np.array([-0.1, 0, 0, 0.02])
+                action = np.array([-0.1, 0, 0, 0.04])
             obs, reward, terminated, truncated, info = env.step(action)
             pixels = env.render()
             for k, v in info.items():

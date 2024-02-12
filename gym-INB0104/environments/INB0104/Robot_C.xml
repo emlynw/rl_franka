@@ -1,9 +1,8 @@
 <mujoco model="INB0104">
   <statistic center="0.3 0 0.4" extent="1"/>
   
-  <include file="panda_actuator.xml"/>
+  <include file="actuators/general.xml"/>
   <include file="panda_assets.xml"/>
-
   <include file="d435i_assets.xml"/>
 
   <visual>
@@ -38,34 +37,26 @@
   <option integrator="implicitfast"/>
 
   <worldbody>
-    <!-- Fixed in the environment -->
+  
     <body name="light0" pos="0 0 2.5">
-      <!-- <site name="light0" pos="0 0 0.1" size="0.1 0.1 0.1" type="sphere" rgba="1 1 1 1"/> -->
       <light pos="0 0 0" dir="0 0 -1" directional="false" diffuse="0.3 0.3 0.3" ambient="0 0 0"/>
     </body>
-
     <geom name="floor" size="0 0 0.05" type="plane" rgba="0.74 0.73 0.67 1"/>
-
     <body name="back_wall" pos="-1 0 2" euler="0 1.57 1.57">
       <geom name="back_wall" type="plane" size="2 2 0.02" material="brick_wall"/> 
     </body>
-
     <body name="side_wall" pos="1 -2 2" euler="-1.57 0 3.1416">
       <geom name="side_wall" type="plane" size="2 2 0.02" material="brick_wall"/> 
     </body>
-
     <body name="back_curtain" pos="-0.4 0 1.45" euler="0 1.57 3.1416">
       <geom name="back_curtain" type="plane" size="0.9 0.6 0.02" rgba="0.2 0.2 0.2 1"/> 
     </body>
-
     <body name="left_curtain" pos="0.2 -0.6 1.65" euler="-1.57 0 3.1416">
       <geom name="left_curtain" type="plane" size="0.6 0.7 0.02" rgba="0.2 0.2 0.2 1"/> 
     </body>
-
     <body name="right_curtain" pos="0.2 0.6 1.45" euler="1.57 0 3.1416">
       <geom name="right_curtain" type="plane" size="0.6 0.9 0.02" rgba="0.2 0.2 0.2 1"/> 
     </body>
-
     <body pos='-0.1575 -0.51 0' euler='0 0 0'>
         <include file="workbench.xml"/>
     </body>
@@ -75,7 +66,7 @@
       <camera name='side_camera' mode="fixed" fovy="57"/> 
     </body>
 
-    <!-- Can change in the environment -->
+    <!-- Robot -->
     <body pos='0 0 0.92' euler='0 0 0'>
         <include file="panda_body.xml"/>
     </body>
@@ -87,6 +78,7 @@
             <geom conaffinity="0" contype="0" pos="0 0 0" rgba="0 0.5 0 0.1" size="0.005 0.005 0.2" type="box" group="3"></geom>
     </body>
 
+    <!-- target object -->
     <body name="target_object" pos="0.5 0 0.925" euler="0 0 1.57">
       <freejoint name="target"/>
       <geom type="mesh" mesh="cuboid" rgba="0.95294117647 0.23921568627 0.23921568627 1.0"/> 
