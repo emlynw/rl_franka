@@ -151,7 +151,8 @@ class joint_velocity_push(MujocoEnv, utils.EzPickle):
         target_site = self._utils.get_site_xpos(self.model, self.data, "target_site").copy()
         r_dist_2 = -np.linalg.norm(target_obj - target_site)
 
-        r_ctrl = -np.square(action).sum()
+        r_ctrl = -np.square(action[0:7]).sum()
+        
         # num_colls = self.data.ncon
         # r_colls = -max(0,num_colls-4)
         # quat = self.data.xquat[10]

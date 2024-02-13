@@ -39,8 +39,8 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
         self.neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.04, 0.04])
         self.action_space = Box(
             np.array([-0.2, -0.2, -0.2, 0.0]),
-            np.array([0.2, 0.2, 0.2, 0.04]),
-            dtype=np.float64,
+            np.array([0.2, 0.2, 0.2, 255]),
+            dtype=np.float32,
         )
         self.ee_low = np.array([0.2, -0.2, 0.93])
         self.ee_high = np.array([0.75, 0.2, 1.0])
@@ -168,14 +168,8 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
         target_site = self._utils.get_site_xpos(self.model, self.data, "target_site").copy()
         r_dist_2 = -np.linalg.norm(target_obj - target_site)
 
-        r_ctrl = -np.square(action).sum()
-        # num_colls = self.data.ncon
-        # r_colls = -max(0,num_colls-4)
-        # quat = self.data.xquat[10]
-        # quat = np.array([quat[0], quat[1], quat[2], quat[3]])
-        # upright_orientation = np.array([1, 0, 1, 0])
-        # r_ori = -np.linalg.norm(quat - upright_orientation)
-        reward = r_dist_1 + r_dist_2 + 4*r_ctrl
+        r_ctrl = -np.square(action[0:3]).sum()
+        reward = 0.25*r_dist_1 + r_dist_2 + r_ctrl
         info = dict(ee_to_obj=r_dist_1, obj_to_target=r_dist_2,  reward_ctrl=r_ctrl) 
 
         return obs, reward, False, False, info 
@@ -193,14 +187,14 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
         self.set_mocap_pose(new_pos, self.grasp_site_pose)
 
     def _get_obs(self):
-        ee_pos = self.get_body_com("ee_center_body")
+        pos = self.get_body_com("ee_center_body").copy() - self.initial_mocap_position.copy()
         gripper_width = self.get_fingers_width()
         if self.use_distance:
             target_pos = self.get_body_com("target_object")
-            distance = np.linalg.norm(target_pos - ee_pos)
-            return np.concatenate([ee_pos, gripper_width, [distance]])
+            distance = np.linalg.norm(target_pos - pos)
+            return np.concatenate([pos, gripper_width, [distance]])
         else:
-            return np.concatenate([ee_pos, gripper_width])
+            return np.concatenate([pos, gripper_width])
         
     # Utils copied from https://github.com/zichunxx/panda_mujoco_gym/blob/master/panda_mujoco_gym/envs/panda_env.py
     def reset_mocap_welds(self, model, data) -> None:
