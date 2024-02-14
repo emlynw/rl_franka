@@ -169,11 +169,19 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
         ee_pos = self.get_body_com("ee_center_body").copy()
         target_pos = self.data.site_xpos[self.example_site_id].copy()
         target_site = self._utils.get_site_xpos(self.model, self.data, "target_site").copy()
-        r_dist_1 = -np.linalg.norm(ee_pos - target_pos)
-        r_dist_2 = -np.linalg.norm(target_pos - target_site)
-        r_ctrl = -np.square(action[0:3]).sum()
-        reward = 0.25*r_dist_1 + 2*r_dist_2 + 2*r_ctrl
-        info = dict(ee_to_obj=r_dist_1, obj_to_target=r_dist_2,  reward_ctrl=r_ctrl) 
+        dist_1 = np.linalg.norm(ee_pos - target_pos)
+        dist_2 = np.linalg.norm(target_pos - target_site)
+        ctrl = np.square(action[0:3]).sum()
+        if dist_1 < 0.04:
+            r_1 = 1.0
+        else:
+            r_1 = -dist_1
+        if dist_2 < 0.04:
+            r_2 = 10.0
+        else:
+            r_2 = -dist_2
+        reward = r_1 + r_2 -ctrl
+        info = dict(ee_to_obj=dist_1, obj_to_target=dist_2,  reward_ctrl=ctrl) 
 
         return obs, reward, False, False, info 
     
