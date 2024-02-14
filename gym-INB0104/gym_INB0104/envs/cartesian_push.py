@@ -42,8 +42,8 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
             np.array([0.2, 0.2, 0.2, 255]),
             dtype=np.float32,
         )
-        self.ee_low = np.array([0.2, -0.2, 0.93])
-        self.ee_high = np.array([0.75, 0.2, 1.0])
+        self.ee_low = np.array([0.2, -0.15, 0.93])
+        self.ee_high = np.array([0.75, 0.15, 0.98])
         self.ep_steps = 0
         self.setup()
 
@@ -91,6 +91,7 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
 
         self.target_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "target_site")
         self.init_target_site_pos = self._utils.get_site_xpos(self.model, self.data, "target_site").copy()
+        self.example_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "example_site")
 
         
 
@@ -137,8 +138,10 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
         if self.model.na != 0:
             self.data.act[:] = None
         self.set_joint_neutral()
+
+        # Move robot
         ee_noise_x = np.random.uniform(low=0.0, high=0.10)
-        ee_noise_y = np.random.uniform(low=-0.2, high=0.2)
+        ee_noise_y = np.random.uniform(low=-0.12, high=0.12)
         ee_noise = np.array([ee_noise_x, ee_noise_y, 0])
         self.initial_mocap_position = [0.25, 0.0, 0.93]
         self.set_mocap_pose(self.initial_mocap_position+ee_noise, self.grasp_site_pose)
@@ -156,20 +159,20 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
         action = np.clip(action, self.action_space.low, self.action_space.high)
         self._set_action(action)
         self._mujoco_step()
+
         # Observation
         obs = self._get_obs()
         if self.render_mode == "human":
             self.render()
+
         # Reward
         ee_pos = self.get_body_com("ee_center_body").copy()
-        target_obj = self.get_body_com("target_object").copy()
-        ee_to_obj = ee_pos - target_obj
-        r_dist_1 = -np.linalg.norm(ee_to_obj)
+        target_pos = self.data.site_xpos[self.example_site_id].copy()
         target_site = self._utils.get_site_xpos(self.model, self.data, "target_site").copy()
-        r_dist_2 = -np.linalg.norm(target_obj - target_site)
-
+        r_dist_1 = -np.linalg.norm(ee_pos - target_pos)
+        r_dist_2 = -np.linalg.norm(target_pos - target_site)
         r_ctrl = -np.square(action[0:3]).sum()
-        reward = 0.25*r_dist_1 + r_dist_2 + r_ctrl
+        reward = 0.25*r_dist_1 + 2*r_dist_2 + 2*r_ctrl
         info = dict(ee_to_obj=r_dist_1, obj_to_target=r_dist_2,  reward_ctrl=r_ctrl) 
 
         return obs, reward, False, False, info 

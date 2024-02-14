@@ -29,7 +29,17 @@ def main():
             else:
                 action = np.array([-0.1, -0.1, -0.1, 255])
             obs, reward, terminated, truncated, info = env.step(action)
-            pixels = env.render()
+            pixels = env.render().copy()
+            cv2.putText(
+                pixels,
+                f"{reward:.3f}",
+                (10, 50 - 10),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.7,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
+            )
             cv2.imshow("pixels", cv2.cvtColor(pixels, cv2.COLOR_RGB2BGR))
             cv2.waitKey(10)
             i+=1
