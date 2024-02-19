@@ -16,7 +16,7 @@ DEFAULT_CAMERA_CONFIG = {
     }
 
 
-class cartesian_push(MujocoEnv, utils.EzPickle):
+class cartesian_reach(MujocoEnv, utils.EzPickle):
     metadata = { 
         "render_modes": [ 
             "human",
@@ -31,7 +31,7 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
         self.use_distance = use_distance
         observation_space = Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64)
         p = Path(__file__).parents[1]
-        env_dir = os.path.join(p, "environments/INB0104/cartesian_push.xml")
+        env_dir = os.path.join(p, "environments/INB0104/cartesian_reach.xml")
         self.frame_skip = 50
         MujocoEnv.__init__(self, env_dir, self.frame_skip, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode
@@ -88,9 +88,6 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
         self.object_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "target_object")
         self.default_obj_pos = np.array([0.5, 0, 1.1])
         self.default_obs_quat = np.array([1, 0, 0, 0])
-
-        self.target_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "target_site")
-        self.init_target_site_pos = self._utils.get_site_xpos(self.model, self.data, "target_site").copy()
         self.object_center_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "object_center_site")
 
         
@@ -120,10 +117,6 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
         self.model.geom_rgba[self.left_curtain_geom_id][3] = alpha
         self.model.geom_rgba[self.right_curtain_geom_id][3] = alpha
         self.model.geom_rgba[self.back_curtain_geom_id][3] = alpha
-        # Move target site
-        self.goal_x_noise = np.random.uniform(low=0.00, high=0.08)
-        self.goal_y_noise = np.random.uniform(low=-0.05, high=0.05)
-        self.model.site_pos[self.target_site_id] = self.init_target_site_pos + [self.goal_x_noise, self.goal_y_noise, 0]
 
         # Move object
         self.object_x_noise = np.random.uniform(low=-0.15, high=0.1)
@@ -168,20 +161,10 @@ class cartesian_push(MujocoEnv, utils.EzPickle):
         # Reward
         ee_pos = self.get_body_com("ee_center_body").copy()
         target_pos = self.data.site_xpos[self.object_center_site_id].copy()
-        target_site = self._utils.get_site_xpos(self.model, self.data, "target_site").copy()
         dist_1 = np.linalg.norm(ee_pos - target_pos)
-        dist_2 = np.linalg.norm(target_pos - target_site)
         ctrl = np.square(action[0:3]).sum()
-        if dist_1 < 0.04:
-            r_1 = 1.0
-        else:
-            r_1 = -dist_1
-        if dist_2 < 0.04:
-            r_2 = 10.0
-        else:
-            r_2 = -dist_2
-        reward = r_1 + r_2 -ctrl
-        info = dict(ee_to_obj=dist_1, obj_to_target=dist_2,  reward_ctrl=ctrl) 
+        reward = -dist_1 - ctrl
+        info = dict(ee_to_obj=dist_1,  reward_ctrl=ctrl) 
 
         return obs, reward, False, False, info 
     
