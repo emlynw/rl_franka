@@ -9,12 +9,11 @@ clone the repository
 cd rl_franka/gym-INB0104
 pip3 install -e .
 
-### Running the current simulation:
-python /rl_franka/gym-INB0104/test/cartesian_velocity_test.py
-python /rl_franka/gym-INB0104/test/joint_velocity_test.py
+### Example:
+python /rl_franka/gym-INB0104/gym_INB0104/test/cartesian_reach.py
 
 ### editing and adding to the simulation:
 - The gymnasium simulation environments are found in /rl_franka/gym-INB0104/gym_INB0104/envs
-- The mujoco xml files are in /rl_franka/gym-INB0104/gym_INB0104/environments/INB0104
+- The mujoco xml files are in /rl_franka/gym-INB0104/gym_INB0104/envs/xmls
 
 
