@@ -3,7 +3,7 @@
   <include file="basic_scene.xml"/>
   <include file="actuators/general.xml"/>
   <option integrator="implicitfast"/>
-  <option actuatorgroupdisable="0"/>
+  <!-- <option actuatorgroupdisable="0"/> -->
 
   <asset>
     <mesh file="cuboid.stl"/>
@@ -11,8 +11,8 @@
 
   <worldbody>
     <!-- Camera --> 
-    <body name = "cam0" pos='1.10 0 1.35' euler='0 0.9 1.57'>
-      <camera name='front_camera' mode="fixed" fovy="57"/> 
+    <body name = "cam0" pos='1.3 0 1.35' euler='0 1.2 1.57'>
+      <camera name='front_camera' mode="fixed" fovy="41"/> 
     </body>
     
     <body mocap="true" name="panda_mocap" pos="0.1 0.01 1.4">

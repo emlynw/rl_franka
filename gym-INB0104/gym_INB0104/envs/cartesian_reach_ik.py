@@ -1,3 +1,4 @@
+# https://github.com/rail-berkeley/serl/blob/e2065d673131af6699aa899a78159859bd17c135/franka_sim/franka_sim/envs/panda_pick_gym_env.py
 import numpy as np
 import os
 
@@ -6,6 +7,7 @@ from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium.spaces import Box
 import mujoco
 from gym_INB0104.envs import mujoco_utils
+from gym_INB0104.controllers import opspace
 from typing import Optional, Any, SupportsFloat
 from pathlib import Path
 
@@ -16,7 +18,7 @@ DEFAULT_CAMERA_CONFIG = {
     }
 
 
-class cartesian_reach(MujocoEnv, utils.EzPickle):
+class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
     metadata = { 
         "render_modes": [ 
             "human",
@@ -31,19 +33,21 @@ class cartesian_reach(MujocoEnv, utils.EzPickle):
         self.use_distance = use_distance
         observation_space = Box(low=-np.inf, high=np.inf, shape=(4,), dtype=np.float64)
         p = Path(__file__).parents[1]
-        env_dir = os.path.join(p, "environments/INB0104/cartesian_reach.xml")
+        env_dir = os.path.join(p, "environments/INB0104/cartesian_reach_ik.xml")
         self.frame_skip = 50
         MujocoEnv.__init__(self, env_dir, self.frame_skip, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
         self.render_mode = render_mode
         self._utils = mujoco_utils
-        self.neutral_joint_values = np.array([0.00, 0.41, 0.00, -1.85, 0.00, 2.26, 0.79, 0.04, 0.04])
+        self.neutral_joint_values = np.array([0, -0.785, 0, -2.35, 0, 1.57, np.pi / 4, 0.04, 0.04])
+        self._CARTESIAN_BOUNDS = np.asarray([[0.2, -0.3, 0], [0.6, 0.3, 0.5]])
+        self._SAMPLING_BOUNDS = np.asarray([[0.25, -0.25], [0.55, 0.25]])
+        self._gripper_ctrl_id = self.model.actuator("actuator8").id
         self.action_space = Box(
             np.array([-0.2, -0.2, -0.2, 0.0]),
             np.array([0.2, 0.2, 0.2, 255]),
             dtype=np.float32,
         )
-        self.ee_low = np.array([0.2, -0.15, 0.93])
-        self.ee_high = np.array([0.75, 0.15, 0.98])
+        self.action_scale: np.ndarray = np.asarray([0.1, 1])
         self.ep_steps = 0
         self.setup()
 
@@ -151,6 +155,19 @@ class cartesian_reach(MujocoEnv, utils.EzPickle):
         if np.array(action).shape != self.action_space.shape:
             raise ValueError("Action dimension mismatch")
         action = np.clip(action, self.action_space.low, self.action_space.high)
+
+        x, y, z, grasp = action
+        pos = self.data.mocap_pos[0].copy() + self.initial_mocap_position
+        dpos = np.asarray([x, y, z]) * self.action_scale[0]
+        npos = np.clip(pos + dpos, *self._CARTESIAN_BOUNDS)
+        self.data.mocap_pos[0] = npos
+
+        g = self.data.ctrl[self._gripper_ctrl_id] / 255
+        dg = grasp * self.action_scale[1]
+        ng = np.clip(g + dg, 0.0, 1.0)
+        self.data.ctrl[self._gripper_ctrl_id] = ng * 255
+
+
         self._set_action(action)
         self._mujoco_step()
 
