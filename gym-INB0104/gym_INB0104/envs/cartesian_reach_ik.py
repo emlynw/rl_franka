@@ -4,9 +4,9 @@ import os
 
 from gymnasium import utils
 from gymnasium.envs.mujoco import MujocoEnv
-from gymnasium.spaces import Box
+from gymnasium.envs.mujoco.mujoco_rendering import MujocoRenderer
+from gymnasium.spaces import Box, Dict
 import mujoco
-from gym_INB0104.envs import mujoco_utils
 from gym_INB0104.controllers import opspace
 from typing import Optional, Any, SupportsFloat
 from pathlib import Path
@@ -25,45 +25,142 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
             "rgb_array", 
             "depth_array"
         ], 
-        "render_fps": 10
     }
     
-    def __init__(self, render_mode=None, use_distance=False, **kwargs):
-        utils.EzPickle.__init__(self, use_distance, **kwargs)
-        self.use_distance = use_distance
-        observation_space = Box(low=-np.inf, high=np.inf, shape=(4,), dtype=np.float64)
-        p = Path(__file__).parents
-        env_dir = os.path.join(p, "xmls/cartesian_reach_ik.xml")
-        self.frame_skip = 50
-        MujocoEnv.__init__(self, env_dir, self.frame_skip, observation_space=observation_space, default_camera_config=DEFAULT_CAMERA_CONFIG, camera_id=0, **kwargs,)
+    def __init__(
+        self,
+        image_obs=True,
+        control_dt=0.05,
+        physics_dt=0.002,
+        width=480,
+        height=480,
+        render_mode="rgb_array",
+        **kwargs,
+    ):
+        utils.EzPickle.__init__(
+            self, 
+            image_obs=image_obs,
+            **kwargs
+        )
+
+        self.image_obs = image_obs
         self.render_mode = render_mode
-        self._utils = mujoco_utils
-        self.neutral_joint_values = np.array([0, -0.785, 0, -2.35, 0, 1.57, np.pi / 4, 0.04, 0.04])
-        self._CARTESIAN_BOUNDS = np.asarray([[0.2, -0.3, 0], [0.6, 0.3, 0.5]])
-        self._SAMPLING_BOUNDS = np.asarray([[0.25, -0.25], [0.55, 0.25]])
-        self._gripper_ctrl_id = self.model.actuator("actuator8").id
+
+        self.observation_space = Dict(
+            {
+                "state": Dict(
+                    {
+                        "panda/tcp_pos": Box(
+                            -np.inf, np.inf, shape=(3,), dtype=np.float32
+                        ),
+                        "panda/tcp_vel": Box(
+                            -np.inf, np.inf, shape=(3,), dtype=np.float32
+                        ),
+                        "panda/gripper_pos": Box(
+                            -np.inf, np.inf, shape=(1,), dtype=np.float32
+                        ),
+                        # "panda/joint_pos": spaces.Box(-np.inf, np.inf, shape=(7,), dtype=np.float32),
+                        # "panda/joint_vel": spaces.Box(-np.inf, np.inf, shape=(7,), dtype=np.float32),
+                        # "panda/joint_torque": specs.Array(shape=(21,), dtype=np.float32),
+                        # "panda/wrist_force": specs.Array(shape=(3,), dtype=np.float32),
+                        "block_pos": Box(
+                            -np.inf, np.inf, shape=(3,), dtype=np.float32
+                        ),
+                    }
+                ),
+            }
+        )
+
+        if self.image_obs:
+            self.observation_space = Dict(
+                {
+                    "state": Dict(
+                        {
+                            "panda/tcp_pos": Box(
+                                -np.inf, np.inf, shape=(3,), dtype=np.float32
+                            ),
+                            "panda/tcp_vel": Box(
+                                -np.inf, np.inf, shape=(3,), dtype=np.float32
+                            ),
+                            "panda/gripper_pos": Box(
+                                -np.inf, np.inf, shape=(1,), dtype=np.float32
+                            ),
+                        }
+                    ),
+                    "images": Dict(
+                        {
+                            "front": Box(
+                                low=0,
+                                high=255,
+                                shape=(height, width, 3),
+                                dtype=np.uint8,
+                            ),
+                            "wrist": Box(
+                                low=0,
+                                high=255,
+                                shape=(height, width, 3),
+                                dtype=np.uint8,
+                            ),
+                        }
+                    ),
+                }
+            )
+
+
+        p = Path(__file__).parent
+        env_dir = os.path.join(p, "xmls/cartesian_reach_ik.xml")
+        self._n_substeps = int(control_dt / physics_dt)
+        self.frame_skip = 1
+
+        MujocoEnv.__init__(
+            self, 
+            env_dir, 
+            self.frame_skip, 
+            observation_space=self.observation_space, 
+            render_mode=self.render_mode,
+            default_camera_config=DEFAULT_CAMERA_CONFIG, 
+            camera_id=0, 
+            **kwargs,
+        )
+
+        self.camera_id = (0, 1)
         self.action_space = Box(
-            np.array([-0.2, -0.2, -0.2, 0.0]),
-            np.array([0.2, 0.2, 0.2, 255]),
+            np.array([-1.0, -1.0, -1.0, -1.0]),
+            np.array([1.0, 1.0, 1.0, 1.0]),
             dtype=np.float32,
         )
-        self.action_scale: np.ndarray = np.asarray([0.1, 1])
-        self.ep_steps = 0
+        self._viewer = MujocoRenderer(
+            self.model,
+            self.data,
+        )
+        self._viewer.render(self.render_mode)
         self.setup()
 
     def setup(self):
-        self.set_joint_neutral()
-        self.data.ctrl[0:7] = self.neutral_joint_values[0:7]
-        self.reset_mocap_welds(self.model, self.data)
-
-        mujoco.mj_forward(self.model, self.data)
-
-        self.initial_mocap_position = self._utils.get_site_xpos(self.model, self.data, "ee_center_site").copy()
-        self.grasp_site_pose = np.array([0, 1, 0, 0])
-        # self.grasp_site_pose = self.get_ee_orientation().copy()
-        self.set_mocap_pose(self.initial_mocap_position, self.grasp_site_pose)
+        self._PANDA_HOME = np.asarray((0, -0.785, 0, -2.35, 0, 1.57, np.pi / 4))
+        self._PANDA_XYZ = np.asarray([0.3, 0, 0.5])
+        self._CARTESIAN_BOUNDS = np.asarray([[0.2, -0.3, 0], [0.6, 0.3, 0.5]])
+        self._SAMPLING_BOUNDS = np.asarray([[0.25, -0.25], [0.55, 0.25]])
+        self._panda_dof_ids = np.asarray(
+            [self.model.joint(f"joint{i}").id for i in range(1, 8)]
+        )
+        self._panda_ctrl_ids = np.asarray(
+            [self.model.actuator(f"actuator{i}").id for i in range(1, 8)]
+        )
+        self._gripper_ctrl_id = self.model.actuator("fingers_actuator").id
+        self._pinch_site_id = self.model.site("pinch").id
+        self._block_z = self.model.geom("block").size[2]
+        self.action_scale: np.ndarray = np.asarray([0.1, 1])
         
-        self._mujoco_step()
+        # Arm to home position
+        self.data.qpos[self._panda_dof_ids] = self._PANDA_HOME
+        mujoco.mj_forward(self.model, self.data)
+        
+        # Reset mocap body to home position
+        tcp_pos = self.data.sensor("pinch_pos").data
+        self.data.mocap_pos[0] = tcp_pos
+
+        mujoco.mj_step(self.model, self.data)
         self.initial_time = self.data.time
         self.initial_qvel = np.copy(self.data.qvel)
 
@@ -89,7 +186,7 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         self.back_curtain_geom_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_GEOM, "back_curtain")
         self.init_back_curtain_rgba = self.model.geom_rgba[self.back_curtain_geom_id].copy()
 
-        self.object_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "target_object")
+        self.object_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "block")
         self.default_obj_pos = np.array([0.5, 0, 1.1])
         self.default_obs_quat = np.array([1, 0, 0, 0])
         self.object_center_site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, "object_center_site")
@@ -97,6 +194,21 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         
 
     def reset_model(self):
+        # Reset arm to home position.
+        self.data.qpos[self._panda_dof_ids] = self._PANDA_HOME
+        mujoco.mj_forward(self.model, self.data)
+
+        # Reset mocap body to home position.
+        tcp_pos = self.data.sensor("pinch_pos").data
+        self.data.mocap_pos[0] = tcp_pos
+
+        # Move robot
+        ee_noise_x = np.random.uniform(low=0.0, high=0.12)
+        ee_noise_y = np.random.uniform(low=-0.2, high=0.2)
+        ee_noise_z = np.random.uniform(low=-0.4, high=0.1)
+        ee_noise = np.array([ee_noise_x, ee_noise_y, ee_noise_z])
+        self.data.mocap_pos[0] = self._PANDA_XYZ + ee_noise
+
         # Add noise to camera position and orientation
         cam_pos_noise = np.random.uniform(low=[-0.05,-0.05,-0.02], high=[0.05,0.05,0.02], size=3)
         cam_quat_noise = np.random.uniform(low=-0.01, high=0.01, size=4)
@@ -105,6 +217,12 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         # Add noise to light position
         light_pos_noise = np.random.uniform(low=[-0.8,-0.5,-0.2], high=[1.2,0.5,0.2], size=3)
         self.model.body_pos[self.light_body_id] = self.init_light_pos + light_pos_noise
+        # Change light levels
+        light_0_diffuse_noise = np.random.uniform(low=0.1, high=0.8, size=1)
+        light_1_diffuse_noise = np.random.uniform(low=0.1, high=0.3, size=1)
+        self.model.light_diffuse[0][:] = light_0_diffuse_noise
+        self.model.light_diffuse[1][:] = light_1_diffuse_noise
+        print(self.model.light_diffuse)
         # Randomize table color
         channel = np.random.randint(0,3)
         table_color_noise = np.random.uniform(low=-0.05, high=0.2, size=1)
@@ -135,18 +253,24 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         self.data.qvel[:] = np.copy(self.initial_qvel)
         if self.model.na != 0:
             self.data.act[:] = None
-        self.set_joint_neutral()
-
-        # Move robot
-        ee_noise_x = np.random.uniform(low=0.0, high=0.10)
-        ee_noise_y = np.random.uniform(low=-0.12, high=0.12)
-        ee_noise = np.array([ee_noise_x, ee_noise_y, 0])
-        self.initial_mocap_position = [0.25, 0.0, 0.93]
-        self.set_mocap_pose(self.initial_mocap_position+ee_noise, self.grasp_site_pose)
 
         mujoco.mj_forward(self.model, self.data)
-        for _ in range(100):
+        for _ in range(5*self._n_substeps):
+            tau = opspace(
+                model=self.model,
+                data=self.data,
+                site_id=self._pinch_site_id,
+                dof_ids=self._panda_dof_ids,
+                pos=self.data.mocap_pos[0],
+                ori=self.data.mocap_quat[0],
+                joint=self._PANDA_HOME,
+                gravity_comp=True,
+            )
+            self.data.ctrl[self._panda_ctrl_ids] = tau
             mujoco.mj_step(self.model, self.data)
+        
+        self._z_init = self.data.sensor("block_pos").data[2]
+        self._z_success = self._z_init + 0.2
         
         return self._get_obs()
 
@@ -157,7 +281,7 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         action = np.clip(action, self.action_space.low, self.action_space.high)
 
         x, y, z, grasp = action
-        pos = self.data.mocap_pos[0].copy() + self.initial_mocap_position
+        pos = self.data.mocap_pos[0].copy()
         dpos = np.asarray([x, y, z]) * self.action_scale[0]
         npos = np.clip(pos + dpos, *self._CARTESIAN_BOUNDS)
         self.data.mocap_pos[0] = npos
@@ -167,9 +291,19 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         ng = np.clip(g + dg, 0.0, 1.0)
         self.data.ctrl[self._gripper_ctrl_id] = ng * 255
 
-
-        self._set_action(action)
-        self._mujoco_step()
+        for _ in range(self._n_substeps):
+            tau = opspace(
+                model=self.model,
+                data=self.data,
+                site_id=self._pinch_site_id,
+                dof_ids=self._panda_dof_ids,
+                pos=self.data.mocap_pos[0],
+                ori=self.data.mocap_quat[0],
+                joint=self._PANDA_HOME,
+                gravity_comp=True,
+            )
+            self.data.ctrl[self._panda_ctrl_ids] = tau
+            mujoco.mj_step(self.model, self.data)
 
         # Observation
         obs = self._get_obs()
@@ -177,65 +311,53 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
             self.render()
 
         # Reward
-        ee_pos = self.get_body_com("ee_center_body").copy()
-        target_pos = self.data.site_xpos[self.object_center_site_id].copy()
-        dist_1 = np.linalg.norm(ee_pos - target_pos)
-        ctrl = np.square(action[0:3]).sum()
-        reward = -dist_1 - ctrl
-        info = dict(ee_to_obj=dist_1,  reward_ctrl=ctrl) 
+        reward, info = self._get_reward(action)
 
         return obs, reward, False, False, info 
     
-    def _set_action(self, action):
-        action = action.copy()
-        new_pos = action[:3] + self.initial_mocap_position
-        gripper_ctrl = action[3]
-        # Control gripper
-        self.data.ctrl[-1] = gripper_ctrl
-        # Change ee position
-        new_pos = np.clip(new_pos, self.ee_low, self.ee_high)
-        self.set_mocap_pose(new_pos, self.grasp_site_pose)
+    def render(self):
+        rendered_frames = []
+        for cam_id in self.camera_id:
+            rendered_frames.append(
+                self._viewer.render(render_mode="rgb_array", camera_id=cam_id)
+            )
+        return rendered_frames
 
     def _get_obs(self):
-        pos = self.get_body_com("ee_center_body").copy() - self.initial_mocap_position.copy()
-        gripper_width = self.get_fingers_width()
-        if self.use_distance:
-            target_pos = self.get_body_com("target_object")
-            distance = np.linalg.norm(target_pos - pos)
-            return np.concatenate([pos, gripper_width, [distance]])
+        obs = {}
+        obs["state"] = {}
+
+        tcp_pos = self.data.sensor("pinch_pos").data
+        obs["state"]["panda/tcp_pos"] = tcp_pos.astype(np.float32)
+
+        tcp_vel = self.data.sensor("pinch_vel").data
+        obs["state"]["panda/tcp_vel"] = tcp_vel.astype(np.float32)
+
+        gripper_pos = np.array(
+            self.data.ctrl[self._gripper_ctrl_id] / 255, dtype=np.float32
+        )
+        obs["state"]["panda/gripper_pos"] = gripper_pos
+
+        if self.image_obs:
+            obs["images"] = {}
+            obs["images"]["front"], obs["images"]["wrist"] = self.render()
         else:
-            return np.concatenate([pos, gripper_width])
+            block_pos = self.data.sensor("block_pos").data.astype(np.float32)
+            obs["state"]["block_pos"] = block_pos
+
+        if self.render_mode == "human":
+            self._viewer.render(self.render_mode)
+
+        return obs
         
-    # Utils from https://github.com/zichunxx/panda_mujoco_gym/blob/master/panda_mujoco_gym/envs/panda_env.py
-    def reset_mocap_welds(self, model, data) -> None:
-        if model.nmocap > 0 and model.eq_data is not None:
-            for i in range(model.eq_data.shape[0]):
-                if model.eq_type[i] == 1:
-                    # relative pose
-                    model.eq_data[i, 3:10] = np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])
-        mujoco.mj_forward(model, data)
+    def _get_reward(self, action):
+        block_pos = self.data.sensor("block_pos").data
+        tcp_pos = self.data.sensor("pinch_pos").data
+        dist = np.linalg.norm(block_pos - tcp_pos)
+        r_close = np.exp(-20 * dist)
+        r_lift = (block_pos[2] - self._z_init) / (self._z_success - self._z_init)
+        r_lift = np.clip(r_lift, 0.0, 1.0)
+        reward = 0.3 * r_close + 0.7 * r_lift
+        info = dict(reward_close=r_close, reward_lift=r_lift)
+        return reward, info
 
-    def set_joint_neutral(self) -> None:
-        # assign value to arm joints
-        self.data.qpos[0:9] = self.neutral_joint_values
-
-    def get_ee_position(self) -> np.ndarray:
-        return self._utils.get_site_xpos(self.model, self.data, "ee_center_site")
-
-    def get_ee_orientation(self) -> np.ndarray:
-        site_mat = self._utils.get_site_xmat(self.model, self.data, "ee_center_site").reshape(9, 1)
-        current_quat = np.empty(4)
-        mujoco.mju_mat2Quat(current_quat, site_mat)
-        return current_quat
-    
-    def set_mocap_pose(self, position, orientation) -> None:
-        self._utils.set_mocap_pos(self.model, self.data, "panda_mocap", position)
-        self._utils.set_mocap_quat(self.model, self.data, "panda_mocap", orientation)
-
-    def _mujoco_step(self, action: Optional[np.ndarray] = None) -> None:
-        mujoco.mj_step(self.model, self.data, nstep=self.frame_skip)
-
-    def get_fingers_width(self) -> np.ndarray:
-        finger1 = self._utils.get_joint_qpos(self.model, self.data, "finger_joint1")
-        finger2 = self._utils.get_joint_qpos(self.model, self.data, "finger_joint2")
-        return finger1 + finger2

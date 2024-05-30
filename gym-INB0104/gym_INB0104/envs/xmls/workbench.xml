@@ -1,4 +1,4 @@
-<mujocoinclude>
+<mujoco model="workbench">
 
     <geom name="back_right_leg"   type="box" pos="0 0 0.45" size="0.02 0.02 0.45" material="aluminium"/>
     <geom name="back_left_leg"    type="box" pos="0 1.02 0.45" size="0.02 0.02 0.45" material="aluminium"/>
@@ -22,4 +22,4 @@
     <!-- <geom name="camera_leg" type="box" pos="0.655 1.08 1.3" size="0.02 0.02 0.5" rgba="0.51764705882 0.5294117647 0.53725490196 1.0"/> -->
 
 
-</mujocoinclude>
+</mujoco>
