@@ -4,28 +4,33 @@ import mujoco
 import numpy as np
 from dm_robotics.transformations import transformations as tr
 
+def pseudo_inverse(M, damped=False, lambda_=0.2):
+    lambda_ = lambda_ if damped else 0.0
+
+    U, sing_vals, V = np.linalg.svd(M, full_matrices=True)
+    S_inv = np.zeros_like(M, dtype=float)
+    for i in range(len(sing_vals)):
+        S_inv[i, i] = sing_vals[i] / (sing_vals[i] ** 2 + lambda_ ** 2)
+
+    return V @ S_inv.T @ U.T
 
 def pd_control(
     x: np.ndarray,
     x_des: np.ndarray,
     dx: np.ndarray,
     kp_kv: np.ndarray,
-    ddx_max: float = 0.0,
+    max_pos_error: float = 0.05,
 ) -> np.ndarray:
     # Compute error.
     x_err = x - x_des
     dx_err = dx
 
+    # Clip pos error
+    x_err = np.clip(x_err, -max_pos_error, max_pos_error)
+
     # Apply gains.
     x_err *= -kp_kv[:, 0]
     dx_err *= -kp_kv[:, 1]
-
-    # Limit maximum error.
-    if ddx_max > 0.0:
-        x_err_sq_norm = np.sum(x_err**2)
-        ddx_max_sq = ddx_max**2
-        if x_err_sq_norm > ddx_max_sq:
-            x_err *= ddx_max / np.sqrt(x_err_sq_norm)
 
     return x_err + dx_err
 
@@ -35,28 +40,31 @@ def pd_control_orientation(
     quat_des: np.ndarray,
     w: np.ndarray,
     kp_kv: np.ndarray,
-    dw_max: float = 0.0,
+    max_ori_error: float = 0.05,
 ) -> np.ndarray:
     # Compute error.
     quat_err = tr.quat_diff_active(source_quat=quat_des, target_quat=quat)
     ori_err = tr.quat_to_axisangle(quat_err)
     w_err = w
 
+    # Clip ori error
+    ori_err = np.clip(ori_err, -max_ori_error, max_ori_error)
+
     # Apply gains.
     ori_err *= -kp_kv[:, 0]
     w_err *= -kp_kv[:, 1]
 
-    # Limit maximum error.
-    if dw_max > 0.0:
-        ori_err_sq_norm = np.sum(ori_err**2)
-        dw_max_sq = dw_max**2
-        if ori_err_sq_norm > dw_max_sq:
-            ori_err *= dw_max / np.sqrt(ori_err_sq_norm)
-
     return ori_err + w_err
 
+def saturate_torque_rate(tau_d_calculated, tau_J_d, delta_tau_max):
+    tau_d_saturated = np.zeros_like(tau_d_calculated)
+    for i in range(len(tau_d_calculated)):
+        difference = tau_d_calculated[i] - tau_J_d[i]
+        tau_d_saturated[i] = tau_J_d[i] + np.clip(difference, -delta_tau_max, delta_tau_max)
+    return tau_d_saturated
 
-def opspace(
+
+def opspace_3(
     model,
     data,
     site_id,
@@ -64,13 +72,18 @@ def opspace(
     pos: Optional[np.ndarray] = None,
     ori: Optional[np.ndarray] = None,
     joint: Optional[np.ndarray] = None,
-    pos_gains: Union[Tuple[float, float, float], np.ndarray] = (200.0, 200.0, 200.0),
-    ori_gains: Union[Tuple[float, float, float], np.ndarray] = (200.0, 200.0, 200.0),
-    damping_ratio: float = 1.0,
-    nullspace_stiffness: float = 0.5,
-    max_pos_acceleration: Optional[float] = None,
-    max_ori_acceleration: Optional[float] = None,
+    pos_gains: Union[Tuple[float, float, float], np.ndarray] = (400.0, 400.0, 400.0),
+    ori_gains: Union[Tuple[float, float, float], np.ndarray] = (150.0, 150.0, 150.0),
+    translational_damping: float = 40.0,
+    rotational_damping: float = 7.16,
+    nullspace_stiffness: float = 10.0,
+    joint1_nullspace_stiffness: float = 10.0,
+    max_pos_error: float = 0.05,
+    max_ori_error: float = 0.05,
+    delta_tau_max: float = 1.0,
     gravity_comp: bool = True,
+    damped: bool = True,
+    lambda_: float = 10.0,
 ) -> np.ndarray:
     if pos is None:
         x_des = data.site_xpos[site_id]
@@ -91,19 +104,12 @@ def opspace(
         q_des = np.asarray(joint)
 
     kp = np.asarray(pos_gains)
-    kd = damping_ratio * 2 * np.sqrt(kp)
+    kd = translational_damping*np.ones_like(kp)
     kp_kv_pos = np.stack([kp, kd], axis=-1)
 
     kp = np.asarray(ori_gains)
-    kd = damping_ratio * 2 * np.sqrt(kp)
+    kd = rotational_damping*np.ones_like(kp)
     kp_kv_ori = np.stack([kp, kd], axis=-1)
-
-    kp_joint = np.full((len(dof_ids),), nullspace_stiffness)
-    kd_joint = damping_ratio * 2 * np.sqrt(kp_joint)
-    kp_kv_joint = np.stack([kp_joint, kd_joint], axis=-1)
-
-    ddx_max = max_pos_acceleration if max_pos_acceleration is not None else 0.0
-    dw_max = max_ori_acceleration if max_ori_acceleration is not None else 0.0
 
     # Get current state.
     q = data.qpos[dof_ids]
@@ -131,7 +137,7 @@ def opspace(
         x_des=x_des,
         dx=dx,
         kp_kv=kp_kv_pos,
-        ddx_max=ddx_max,
+        max_pos_error=max_pos_error,
     )
 
     # Compute orientation PD control.
@@ -144,37 +150,31 @@ def opspace(
         quat_des=quat_des,
         w=w,
         kp_kv=kp_kv_ori,
-        dw_max=dw_max,
+        max_ori_error=max_ori_error,
     )
 
-    # Compute inertia matrix in joint space.
-    M = np.zeros((model.nv, model.nv), dtype=np.float64)
-    mujoco.mj_fullM(model, M, data.qM)
-    M = M[dof_ids, :][:, dof_ids]
+    # Compute Coriolis and centrifugal terms.
+    C = data.qfrc_bias[dof_ids]
 
-    # Compute inertia matrix in task space.
-    M_inv = np.linalg.inv(M)
-    Mx_inv = J @ M_inv @ J.T
-    if abs(np.linalg.det(Mx_inv)) >= 1e-2:
-        Mx = np.linalg.inv(Mx_inv)
-    else:
-        Mx = np.linalg.pinv(Mx_inv, rcond=1e-2)
+    # Compute task-space forces.
+    F = np.concatenate([ddx, dw])
 
-    # Compute generalized forces.
-    ddx_dw = np.concatenate([ddx, dw], axis=0)
-    tau = J.T @ Mx @ ddx_dw
+    # Compute joint torques using Jacobian transpose.
+    tau_task = J.T @ F
 
-    # Add joint task in nullspace.
-    ddq = pd_control(
-        x=q,
-        x_des=q_des,
-        dx=dq,
-        kp_kv=kp_kv_joint,
-        ddx_max=0.0,
-    )
-    Jnull = M_inv @ J.T @ Mx
-    tau += (np.eye(len(q)) - J.T @ Jnull.T) @ ddq
+    # Nullspace control.
+    q_error = q_des - q
+    q_error[1] *= joint1_nullspace_stiffness
+    dq_error = -dq
+    dq_error[1] *= 2*np.sqrt(joint1_nullspace_stiffness)
+    tau_nullspace = nullspace_stiffness * q_error + 2*np.sqrt(nullspace_stiffness) * dq_error
+    if damped:
+        jacobian_transpose_pinv = pseudo_inverse(J.T, damped=damped, lambda_=lambda_)
+        tau_nullspace = (np.eye(len(dof_ids)) - J.T @ jacobian_transpose_pinv) @ tau_nullspace
 
+    tau = tau_task + tau_nullspace
     if gravity_comp:
-        tau += data.qfrc_bias[dof_ids]
-    return tau
+        tau += C
+
+    tau_d = saturate_torque_rate(tau, data.qfrc_actuator[dof_ids], delta_tau_max)
+    return tau_d

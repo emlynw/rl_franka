@@ -17,7 +17,7 @@ gym_INB0104/envs/non_cartesian.py
 gym_INB0104/test/cartesian_push.py
 gym_INB0104/test/cartesian_reach.py
 gym_INB0104/test/cartesian_reach_ik.py
-gym_INB0104/test/joint_velocity_test.py
+gym_INB0104/test/joint_velocity.py
 gym_INB0104/test/wrappers.py
 gym_INB0104/wrappers/__init__.py
 gym_INB0104/wrappers/reacher.py

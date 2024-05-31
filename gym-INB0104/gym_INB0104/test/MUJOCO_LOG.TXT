@@ -1,0 +1,6 @@
+Fri May 31 14:54:37 2024
+WARNING: mju_openResource: unknown file '/home/emlyn/rl_franka/gym-INB0104/gym_INB0104/envs/xmls/frame_chain.xml'
+
+Fri May 31 14:54:43 2024
+WARNING: mju_openResource: unknown file '/home/emlyn/rl_franka/gym-INB0104/gym_INB0104/envs/xmls/frame_chain.xml'
+

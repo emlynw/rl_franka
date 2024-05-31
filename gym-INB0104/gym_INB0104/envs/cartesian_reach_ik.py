@@ -7,7 +7,7 @@ from gymnasium.envs.mujoco import MujocoEnv
 from gymnasium.envs.mujoco.mujoco_rendering import MujocoRenderer
 from gymnasium.spaces import Box, Dict
 import mujoco
-from gym_INB0104.controllers import opspace
+from gym_INB0104.controllers import opspace_3 as opspace
 from typing import Optional, Any, SupportsFloat
 from pathlib import Path
 
@@ -31,7 +31,7 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         self,
         image_obs=True,
         control_dt=0.05,
-        physics_dt=0.002,
+        physics_dt=0.001,
         width=480,
         height=480,
         render_mode="rgb_array",
@@ -45,31 +45,6 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
 
         self.image_obs = image_obs
         self.render_mode = render_mode
-
-        self.observation_space = Dict(
-            {
-                "state": Dict(
-                    {
-                        "panda/tcp_pos": Box(
-                            -np.inf, np.inf, shape=(3,), dtype=np.float32
-                        ),
-                        "panda/tcp_vel": Box(
-                            -np.inf, np.inf, shape=(3,), dtype=np.float32
-                        ),
-                        "panda/gripper_pos": Box(
-                            -np.inf, np.inf, shape=(1,), dtype=np.float32
-                        ),
-                        # "panda/joint_pos": spaces.Box(-np.inf, np.inf, shape=(7,), dtype=np.float32),
-                        # "panda/joint_vel": spaces.Box(-np.inf, np.inf, shape=(7,), dtype=np.float32),
-                        # "panda/joint_torque": specs.Array(shape=(21,), dtype=np.float32),
-                        # "panda/wrist_force": specs.Array(shape=(3,), dtype=np.float32),
-                        "block_pos": Box(
-                            -np.inf, np.inf, shape=(3,), dtype=np.float32
-                        ),
-                    }
-                ),
-            }
-        )
 
         if self.image_obs:
             self.observation_space = Dict(
@@ -105,6 +80,31 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
                     ),
                 }
             )
+        else:
+            self.observation_space = Dict(
+            {
+                "state": Dict(
+                    {
+                        "panda/tcp_pos": Box(
+                            -np.inf, np.inf, shape=(3,), dtype=np.float32
+                        ),
+                        "panda/tcp_vel": Box(
+                            -np.inf, np.inf, shape=(3,), dtype=np.float32
+                        ),
+                        "panda/gripper_pos": Box(
+                            -np.inf, np.inf, shape=(1,), dtype=np.float32
+                        ),
+                        # "panda/joint_pos": spaces.Box(-np.inf, np.inf, shape=(7,), dtype=np.float32),
+                        # "panda/joint_vel": spaces.Box(-np.inf, np.inf, shape=(7,), dtype=np.float32),
+                        # "panda/joint_torque": specs.Array(shape=(21,), dtype=np.float32),
+                        # "panda/wrist_force": specs.Array(shape=(3,), dtype=np.float32),
+                        "block_pos": Box(
+                            -np.inf, np.inf, shape=(3,), dtype=np.float32
+                        ),
+                    }
+                ),
+            }
+        )
 
 
         p = Path(__file__).parent
@@ -203,11 +203,11 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         self.data.mocap_pos[0] = tcp_pos
 
         # Move robot
-        ee_noise_x = np.random.uniform(low=0.0, high=0.12)
-        ee_noise_y = np.random.uniform(low=-0.2, high=0.2)
-        ee_noise_z = np.random.uniform(low=-0.4, high=0.1)
-        ee_noise = np.array([ee_noise_x, ee_noise_y, ee_noise_z])
-        self.data.mocap_pos[0] = self._PANDA_XYZ + ee_noise
+        # ee_noise_x = np.random.uniform(low=0.0, high=0.12)
+        # ee_noise_y = np.random.uniform(low=-0.2, high=0.2)
+        # ee_noise_z = np.random.uniform(low=-0.4, high=0.1)
+        # ee_noise = np.array([ee_noise_x, ee_noise_y, ee_noise_z])
+        self.data.mocap_pos[0] = self._PANDA_XYZ
 
         # Add noise to camera position and orientation
         cam_pos_noise = np.random.uniform(low=[-0.05,-0.05,-0.02], high=[0.05,0.05,0.02], size=3)
@@ -222,7 +222,6 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         light_1_diffuse_noise = np.random.uniform(low=0.1, high=0.3, size=1)
         self.model.light_diffuse[0][:] = light_0_diffuse_noise
         self.model.light_diffuse[1][:] = light_1_diffuse_noise
-        print(self.model.light_diffuse)
         # Randomize table color
         channel = np.random.randint(0,3)
         table_color_noise = np.random.uniform(low=-0.05, high=0.2, size=1)
