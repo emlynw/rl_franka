@@ -7,6 +7,8 @@ gym_INB0104.egg-info/requires.txt
 gym_INB0104.egg-info/top_level.txt
 gym_INB0104/controllers/__init__.py
 gym_INB0104/controllers/opspace.py
+gym_INB0104/controllers/opspace_2.py
+gym_INB0104/controllers/opspace_3.py
 gym_INB0104/envs/__init__.py
 gym_INB0104/envs/cartesian_push.py
 gym_INB0104/envs/cartesian_reach.py

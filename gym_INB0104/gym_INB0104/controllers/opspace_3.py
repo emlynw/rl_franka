@@ -72,18 +72,18 @@ def opspace_3(
     pos: Optional[np.ndarray] = None,
     ori: Optional[np.ndarray] = None,
     joint: Optional[np.ndarray] = None,
-    pos_gains: Union[Tuple[float, float, float], np.ndarray] = (400.0, 400.0, 400.0),
-    ori_gains: Union[Tuple[float, float, float], np.ndarray] = (150.0, 150.0, 150.0),
-    translational_damping: float = 40.0,
-    rotational_damping: float = 7.16,
-    nullspace_stiffness: float = 10.0,
-    joint1_nullspace_stiffness: float = 10.0,
-    max_pos_error: float = 0.05,
+    pos_gains: Union[Tuple[float, float, float], np.ndarray] = (2000.0, 2000.0, 2000.0),
+    ori_gains: Union[Tuple[float, float, float], np.ndarray] = (200.0, 200.0, 200.0),
+    translational_damping: float = 89.0,
+    rotational_damping: float = 7.0,
+    nullspace_stiffness: float = 0.2,
+    joint1_nullspace_stiffness: float = 100.0,
+    max_pos_error: float = 0.01,
     max_ori_error: float = 0.05,
-    delta_tau_max: float = 1.0,
+    delta_tau_max: float = 0.5,
     gravity_comp: bool = True,
     damped: bool = True,
-    lambda_: float = 10.0,
+    lambda_: float = 0.2,
 ) -> np.ndarray:
     if pos is None:
         x_des = data.site_xpos[site_id]
@@ -99,9 +99,9 @@ def opspace_3(
         else:
             quat_des = ori
     if joint is None:
-        q_des = data.qpos[dof_ids]
+        q_d_nullspace = data.qpos[dof_ids]
     else:
-        q_des = np.asarray(joint)
+        q_d_nullspace = np.asarray(joint)
 
     kp = np.asarray(pos_gains)
     kd = translational_damping*np.ones_like(kp)
@@ -163,11 +163,11 @@ def opspace_3(
     tau_task = J.T @ F
 
     # Nullspace control.
-    q_error = q_des - q
-    q_error[1] *= joint1_nullspace_stiffness
-    dq_error = -dq
-    dq_error[1] *= 2*np.sqrt(joint1_nullspace_stiffness)
-    tau_nullspace = nullspace_stiffness * q_error + 2*np.sqrt(nullspace_stiffness) * dq_error
+    q_error = q_d_nullspace - q
+    q_error[0] *= joint1_nullspace_stiffness
+    dq_error = dq
+    dq_error[0] *= 2*np.sqrt(joint1_nullspace_stiffness)
+    tau_nullspace = nullspace_stiffness * q_error - 2*np.sqrt(nullspace_stiffness) * dq_error
     if damped:
         jacobian_transpose_pinv = pseudo_inverse(J.T, damped=damped, lambda_=lambda_)
         tau_nullspace = (np.eye(len(dof_ids)) - J.T @ jacobian_transpose_pinv) @ tau_nullspace

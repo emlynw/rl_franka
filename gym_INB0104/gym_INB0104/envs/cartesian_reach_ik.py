@@ -30,7 +30,7 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
     def __init__(
         self,
         image_obs=True,
-        control_dt=0.05,
+        control_dt=0.1,
         physics_dt=0.001,
         width=480,
         height=480,
@@ -137,7 +137,8 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         self.setup()
 
     def setup(self):
-        self._PANDA_HOME = np.asarray((0, -0.785, 0, -2.35, 0, 1.57, np.pi / 4))
+        # self._PANDA_HOME = np.asarray((0, -0.785, 0, -2.35, 0, 1.57, np.pi / 4))
+        self._PANDA_HOME = np.asarray((-0.00171672, -0.786471, -0.00122413, -2.36062, 0.00499334, 1.56444, 0.772088))
         self._PANDA_XYZ = np.asarray([0.3, 0, 0.5])
         self._CARTESIAN_BOUNDS = np.asarray([[0.2, -0.3, 0], [0.6, 0.3, 0.5]])
         self._SAMPLING_BOUNDS = np.asarray([[0.25, -0.25], [0.55, 0.25]])
@@ -150,7 +151,7 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         self._gripper_ctrl_id = self.model.actuator("fingers_actuator").id
         self._pinch_site_id = self.model.site("pinch").id
         self._block_z = self.model.geom("block").size[2]
-        self.action_scale: np.ndarray = np.asarray([0.1, 1])
+        self.action_scale: np.ndarray = np.asarray([0.08, 1])
         
         # Arm to home position
         self.data.qpos[self._panda_dof_ids] = self._PANDA_HOME
@@ -163,6 +164,8 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         mujoco.mj_step(self.model, self.data)
         self.initial_time = self.data.time
         self.initial_qvel = np.copy(self.data.qvel)
+        self.prev_time = 0.0
+        self.prev_grasp = -1.0
 
         self.cam_body_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "cam0")
         self.init_cam_pos = self.model.body_pos[self.cam_body_id].copy()
@@ -203,10 +206,10 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         self.data.mocap_pos[0] = tcp_pos
 
         # Move robot
-        # ee_noise_x = np.random.uniform(low=0.0, high=0.12)
-        # ee_noise_y = np.random.uniform(low=-0.2, high=0.2)
-        # ee_noise_z = np.random.uniform(low=-0.4, high=0.1)
-        # ee_noise = np.array([ee_noise_x, ee_noise_y, ee_noise_z])
+        ee_noise_x = np.random.uniform(low=0.0, high=0.12)
+        ee_noise_y = np.random.uniform(low=-0.2, high=0.2)
+        ee_noise_z = np.random.uniform(low=-0.4, high=0.1)
+        ee_noise = np.array([ee_noise_x, ee_noise_y, ee_noise_z])
         self.data.mocap_pos[0] = self._PANDA_XYZ
 
         # Add noise to camera position and orientation
@@ -215,13 +218,11 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         self.model.body_pos[self.cam_body_id] = self.init_cam_pos + cam_pos_noise
         self.model.body_quat[self.cam_body_id] = self.init_cam_quat + cam_quat_noise
         # Add noise to light position
-        light_pos_noise = np.random.uniform(low=[-0.8,-0.5,-0.2], high=[1.2,0.5,0.2], size=3)
+        light_pos_noise = np.random.uniform(low=[-0.8,-0.5,-0.05], high=[1.2,0.5,0.2], size=3)
         self.model.body_pos[self.light_body_id] = self.init_light_pos + light_pos_noise
         # Change light levels
         light_0_diffuse_noise = np.random.uniform(low=0.1, high=0.8, size=1)
-        light_1_diffuse_noise = np.random.uniform(low=0.1, high=0.3, size=1)
         self.model.light_diffuse[0][:] = light_0_diffuse_noise
-        self.model.light_diffuse[1][:] = light_1_diffuse_noise
         # Randomize table color
         channel = np.random.randint(0,3)
         table_color_noise = np.random.uniform(low=-0.05, high=0.2, size=1)
@@ -284,11 +285,22 @@ class cartesian_reach_ik(MujocoEnv, utils.EzPickle):
         dpos = np.asarray([x, y, z]) * self.action_scale[0]
         npos = np.clip(pos + dpos, *self._CARTESIAN_BOUNDS)
         self.data.mocap_pos[0] = npos
-
-        g = self.data.ctrl[self._gripper_ctrl_id] / 255
-        dg = grasp * self.action_scale[1]
-        ng = np.clip(g + dg, 0.0, 1.0)
-        self.data.ctrl[self._gripper_ctrl_id] = ng * 255
+        if self.data.time - self.prev_time < 0.5:
+            grasp = self.prev_grasp
+        else:
+            grasp = grasp
+            self.prev_time = self.data.time
+            self.prev_grasp = grasp
+        
+        if grasp > 0:
+            g = 0
+        else:
+            g = 255
+        self.data.ctrl[self._gripper_ctrl_id] = g
+        # g = self.data.ctrl[self._gripper_ctrl_id] / 255
+        # dg = grasp * self.action_scale[1]
+        # ng = np.clip(g + dg, 0.0, 1.0)
+        # self.data.ctrl[self._gripper_ctrl_id] = ng * 255
 
         for _ in range(self._n_substeps):
             tau = opspace(
